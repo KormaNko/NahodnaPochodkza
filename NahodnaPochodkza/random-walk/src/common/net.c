@@ -92,6 +92,42 @@ int siet_pripoj_sa_tcp(const char *host, const char *port) {
     return -1;
 }
 
-int siet_pocuvaj_tcp(const char *host, const char *port, int backlog) {
-    
+int siet_pocuvaj_tcp(const char *port, int backlog) {
+    struct addrinfo pomoc;
+    memset(&pomoc, 0, sizeof(pomoc));
+    pomoc.ai_family = AF_UNSPEC;        // IPv4 aj IPv6
+    pomoc.ai_socktype = SOCK_STREAM;    // TCP
+    pomoc.ai_flags = AI_PASSIVE;        // server: bind na "všetko"
+
+    struct addrinfo *ukazovatelNaZaciatokZoznamuAdries = NULL;
+    int info = getaddrinfo(NULL, port, &pomoc, &ukazovatelNaZaciatokZoznamuAdries);
+    if (info != 0) return -1;
+
+    for (struct addrinfo *kurzorAdries = ukazovatelNaZaciatokZoznamuAdries; kurzorAdries != NULL; kurzorAdries = kurzorAdries->ai_next) {
+
+        int fd = socket(kurzorAdries->ai_family,
+                        kurzorAdries->ai_socktype,
+                        kurzorAdries->ai_protocol);
+        if (fd < 0) continue;
+
+       (void)znovuPouzitie(fd);
+
+        if (bind(fd, kurzorAdries->ai_addr, kurzorAdries->ai_addrlen) == 0) {
+            if (listen(fd, backlog) == 0) {
+                freeaddrinfo(ukazovatelNaZaciatokZoznamuAdries);
+                return fd; 
+            }
+        }
+
+        close(fd); 
+    }
+
+    freeaddrinfo(ukazovatelNaZaciatokZoznamuAdries);
+    return -1;
+}
+
+int siet_prijmi_klienta(int listen_fd) {
+    int info = accept(listen_fd,NULL,NULL);
+    if(info < 0) perror("accept");
+    return info;
 }
