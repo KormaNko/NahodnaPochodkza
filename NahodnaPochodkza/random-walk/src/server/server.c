@@ -5,54 +5,63 @@
 #include <string.h>
 #include <unistd.h>
 
-static volatile sig_atomic_t zastav = 0;
+static volatile sig_atomic_t zastavit = 0;
 
-static void pri_sigint(int sig) {
+static void siginit(int sig) {
     (void)sig;
-    zastav = 1;
-}
+    zastavit = 1;
+} 
 
 int main(int argc, char **argv) {
-    if (argc != 2) {
-        fprintf(stderr, "Pouzitie: %s <port>\nPriklad: %s 5555\n", argv[0], argv[0]);
+    
+    if(argc != 2) {
+        fprintf(stderr,"chyba pozui spravne parametre");
         return 2;
     }
 
-    signal(SIGINT, pri_sigint);
+    signal(SIGINT,siginit);
 
-    const char *port = argv[1];
+    const char * port = argv[1];
 
-    int lfd = siet_pocuvaj_tcp(port, 8);
-    if (lfd < 0) {
-        fprintf(stderr, "Nepodarilo sa spustit server na porte %s\n", port);
-        return 1;
+    int pripajanie = siet_pocuvaj_tcp(port,8);
+
+    if(pripajanie < 0 ) {
+        fprintf(stderr,"chyba");
+        return 3;
     }
 
-    printf("Server pocuva na porte %s\n", port);
+    printf("Cakam na pripojenie klienta na porte : %s\n",port);
     fflush(stdout);
 
-    while (!zastav) {
-        int cfd = siet_prijmi_klienta(lfd);
-        if (cfd < 0) continue;
-
-        char riadok[256];
-        int n = siet_precitaj_riadok(cfd, riadok, sizeof(riadok));
-        if (n > 0) {
-            printf("Prislo: %s", riadok);
-
-            if (strcmp(riadok, "HELLO\n") == 0) {
-                const char *ok = "OK\n";
-                (void)siet_posli_vsetko(cfd, ok, strlen(ok));
-            } else {
-                const char *err = "ERR neznamy prikaz\n";
-                (void)siet_posli_vsetko(cfd, err, strlen(err));
+    while(zastavit == 0) {
+           int prijaty = siet_prijmi_klienta(pripajanie); 
+            if(prijaty < 0) {
+                continue;
             }
+    
+
+    char riadok[256];
+
+    int riad = siet_precitaj_riadok(prijaty,riadok,sizeof(riadok));
+    if(riad > 0) {
+        printf("Prisiel riadok %s \n",riadok);
+        if(strcmp(riadok,"HELLO\n") == 0) {
+           const char * dorucenaNaServer = "CAU\n";
+           (void)siet_posli_vsetko(prijaty,dorucenaNaServer,strlen(dorucenaNaServer));
+
+        }else {
+            const char * err= "necznami prikaz\n";
+           (void)siet_posli_vsetko(prijaty,err,strlen(err));
         }
-
-        close(cfd);
+        
+    } else if (riad == 0) {
+    fprintf(stderr, "Klient zavrel spojenie bez spravy\n");
+    } else {
+    fprintf(stderr, "Chyba pri citani\n");
+    }   
+    close(prijaty);
     }
-
-    close(lfd);
-    printf("Server ukonceny\n");
+    close(pripajanie);
+    printf("Serve rukonceny");
     return 0;
 }

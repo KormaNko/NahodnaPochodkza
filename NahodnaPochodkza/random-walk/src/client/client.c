@@ -7,38 +7,38 @@
 
 int main(int argc, char **argv) {
     if (argc != 3) {
-        fprintf(stderr, "Pouzitie: %s <host> <port>\nPriklad: %s 127.0.0.1 5555\n",
-                argv[0], argv[0]);
+        printf("chyba");
         return 2;
     }
 
-    const char *host = argv[1];
-    const char *port = argv[2];
+    const char * host = argv[1];
+    const char * port = argv[2];
 
-    int fd = siet_pripoj_sa_tcp(host, port);
-    if (fd < 0) {
-        fprintf(stderr, "Nepodarilo sa pripojit na %s:%s\n", host, port);
+    int pripojenie = siet_pripoj_sa_tcp(host,port);
+    if(pripojenie < 0) {
+        printf("Nepodarilo sa pripojit");
         return 1;
     }
 
-    const char *msg = "HELLO\n";
-    if (siet_posli_vsetko(fd, msg, strlen(msg)) < 0) {
-        close(fd);
+    const char * spravaPreServer = "HELLO\n";
+
+    int odosielam = siet_posli_vsetko(pripojenie,spravaPreServer,strlen(spravaPreServer));
+    if (odosielam < 0) {
+        close(pripojenie);
         return 1;
     }
 
     char riadok[256];
-    int n = siet_precitaj_riadok(fd, riadok, sizeof(riadok));
-    if (n > 0) {
-        printf("%s", riadok); // ocakavas "OK\n" alebo "ERR ...\n"
-    } else if (n == 0) {
-        fprintf(stderr, "Server zatvoril spojenie bez odpovede\n");
-    } else {
-        // siet_precitaj_riadok uz vypise perror("read")
-        close(fd);
-        return 1;
-    }
+    int n = siet_precitaj_riadok(pripojenie,riadok,sizeof(riadok));
 
-    close(fd);
+    if(n > 0) {
+        printf("Toto mi poslal server: %s",riadok);
+    }else {
+        printf("koniec");
+    }
+    close(pripojenie);
     return 0;
 }
+    
+
+
