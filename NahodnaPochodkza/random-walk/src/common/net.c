@@ -1,9 +1,12 @@
 #include "net.h"
-#include <sys/socket.h>
+
 #include <errno.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <netdb.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 static int znovuPouzitie(int identifikator) {
     int pravda = 1;
