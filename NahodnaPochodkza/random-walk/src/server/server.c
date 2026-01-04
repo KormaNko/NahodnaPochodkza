@@ -4,12 +4,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
+#include <sys/select.h>
 
-static volatile sig_atomic_t zastavit = 0;
 
-static void siginit(int sig) {
+
+static void ukoncenie(int sig) {
     (void)sig;
-    zastavit = 1;
 } 
 
 int main(int argc, char **argv) {
@@ -19,7 +20,7 @@ int main(int argc, char **argv) {
         return 2;
     }
 
-    signal(SIGINT,siginit);
+   
 
     const char * port = argv[1];
 
@@ -30,37 +31,87 @@ int main(int argc, char **argv) {
         return 3;
     }
 
+
+    struct sigaction sa;    // tu v tomto odseku som si pomahal s copilotom
+    memset(&sa,0,sizeof(sa));
+    sa.sa_handler = ukoncenie;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    if(sigaction(SIGINT,&sa,NULL) < 0) {
+        perror("sigaction");
+        close(pripajanie);
+        return 4;
+    }  
+    
+    sigset_t blocked;                   
+    sigset_t empty;                      
+    sigemptyset(&blocked);              
+    sigaddset(&blocked, SIGINT);         
+    if (sigprocmask(SIG_BLOCK, &blocked, NULL) < 0) { 
+        perror("sigprocmask");           
+        close(pripajanie);               
+        return 5;                        
+    }                                    
+    sigemptyset(&empty);    
+        // tu ta cast konci
+
     printf("Cakam na pripojenie klienta na porte : %s\n",port);
     fflush(stdout);
 
-    while(zastavit == 0) {
+    while(1) {
+
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        FD_SET(pripajanie,&rfds);
+
+        int r = pselect(pripajanie + 1, &rfds, NULL, NULL, NULL, &empty); 
+        if (r < 0) {                    
+            if (errno == EINTR) {      
+                break;                   
+            }                            
+            perror("pselect");           
+            break;                      
+        }                                
+
+
            int prijaty = siet_prijmi_klienta(pripajanie); 
             if(prijaty < 0) {
                 continue;
             }
     
 
+    while(1){
     char riadok[256];
-
     int riad = siet_precitaj_riadok(prijaty,riadok,sizeof(riadok));
     if(riad > 0) {
-        printf("Prisiel riadok %s \n",riadok);
+        printf("Prisiel riadok %s ",riadok);
         if(strcmp(riadok,"HELLO\n") == 0) {
            const char * dorucenaNaServer = "CAU\n";
            (void)siet_posli_vsetko(prijaty,dorucenaNaServer,strlen(dorucenaNaServer));
 
-        }else {
-            const char * err= "necznami prikaz\n";
+        }else if(strcmp(riadok,"QUIT\n") == 0) {
+            const char * dorucenaNaServer = "BYE\n";
+           (void)siet_posli_vsetko(prijaty,dorucenaNaServer,strlen(dorucenaNaServer));
+           break;
+        }
+        else {
+            const char * err= "neznami prikaz\n";
            (void)siet_posli_vsetko(prijaty,err,strlen(err));
         }
         
     } else if (riad == 0) {
     fprintf(stderr, "Klient zavrel spojenie bez spravy\n");
+    break;
     } else {
     fprintf(stderr, "Chyba pri citani\n");
+    break;
     }   
-    close(prijaty);
+    
     }
+    close(prijaty);    
+    }
+   
+
     close(pripajanie);
     printf("Serve rukonceny");
     return 0;
