@@ -5,10 +5,12 @@
 #include <unistd.h>
 #include "net.h"
 #include <pthread.h>
+#include <stdlib.h>
 
 typedef struct  {
     int fd;
 }spolocneData;
+
 
 
 void * prijmac_sprav_od_servera(void * arg) {
@@ -21,7 +23,7 @@ void * prijmac_sprav_od_servera(void * arg) {
         if(info > 0){
                     printf("Toto mi poslal server: %s",riadok);
         }else if(info == 0) {
-            printf("Server ukoncil komunikaciu");
+            printf("Server ukoncil komunikaciu\n");
             break;
         }else {
             printf("chyba");
@@ -43,7 +45,7 @@ int main(int argc, char **argv) {
     const char * port = argv[2];
     int pripojenie = siet_pripoj_sa_tcp(host,port);
     if(pripojenie < 0) {
-        printf("Nepodarilo sa pripojit");
+        printf("Nepodarilo sa pripojit\n");
         return 1;
     }
     
@@ -51,27 +53,68 @@ int main(int argc, char **argv) {
     spolocneData sp;
     sp.fd = pripojenie;
 
-    pthread_create(&komunikaciaServer,NULL,prijmac_sprav_od_servera,&sp);
-
-    const char * spravaPreServer = "HELLO\n";
-
-    int odosielam = siet_posli_vsetko(pripojenie,spravaPreServer,strlen(spravaPreServer));
-    if (odosielam < 0) {
+    if(pthread_create(&komunikaciaServer,NULL,prijmac_sprav_od_servera,&sp) != 0) {
         close(pripojenie);
-        return 1;
+        return 5;
     }
 
-    sleep(5);
-spravaPreServer = "QUIT\n";
 
-   odosielam = siet_posli_vsetko(pripojenie,spravaPreServer,strlen(spravaPreServer));
-    if (odosielam < 0) {
+    const char * handshake = "HELLO\n";
+    int skusamPripojenie = siet_posli_vsetko(pripojenie,handshake,strlen(handshake));
+
+    if(skusamPripojenie < 0) {
+        pthread_join(komunikaciaServer,NULL);
         close(pripojenie);
-        return 1;
+        return 6;
+    }
+        const char * spravaMenu;
+        char sprava[256];
+    while(1) {
+
+    printf("Menu: \n"); 
+    printf("1) MODE INTERACTIVE\n");
+    printf("2) MODE SUMMARY\n");
+    printf("3) GET STATE\n");
+    printf("0) QUIT\n");
+    fflush(stdout);
+    
+
+    if(fgets(sprava, sizeof(sprava), stdin) == NULL) {
+        break;
+    }
+    int cisloVmenu = atoi(sprava);
+    switch (cisloVmenu)
+    {
+    case 0:
+        spravaMenu= "QUIT\n";
+        break;
+    case 1:
+        spravaMenu= "MODE INTERACTIVE\n";
+        break;
+    case 2:
+        spravaMenu= "MODE SUMMARY\n";
+        break;
+    case 3:
+        spravaMenu= "GET STATE\n";
+        break;
+    default:
+        printf("Takyto prikaz nepoznam\n");
+        continue;
     }
 
+    int sent= siet_posli_vsetko(pripojenie,spravaMenu,strlen(spravaMenu));
+    if (sent < 0) {
+        break;
+    }
+
+    if(strcmp(spravaMenu,"QUIT\n") == 0) {
+        break;
+    }
+    }
+ 
+   
     pthread_join(komunikaciaServer,NULL);
-    close(pripojenie);
+     close(pripojenie);
     return 0;
 }
     
