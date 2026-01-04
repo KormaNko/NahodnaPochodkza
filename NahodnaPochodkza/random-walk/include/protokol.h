@@ -1,0 +1,11 @@
+
+typedef enum {
+PROTO_CMD_HELLO,
+PROTO_CMD_QUIT,
+PROTO_CMD_MODE_INTERACTIVE,
+PROTO_CMD_MODE_SUMMARY,
+PROTO_CMD_GET_STATE,
+PROTO_CMD_UNKNOWN
+}spravy;
+
+spravy protocol_parse_line(const char *line);
