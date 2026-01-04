@@ -3,8 +3,8 @@ CFLAGS=-std=c11 -Wall -Wextra -pedantic -O2 -g
 INCLUDES=-Iinclude
 LDLIBS=-pthread
 
-COMMON_SRC=src/common/net.c src/common/config.c
-SERVER_SRC=src/server/server.c
+COMMON_SRC=src/common/net.c src/common/config.c src/common/protokol.c
+SERVER_SRC=src/server/server.c src/server/simulation.c
 CLIENT_SRC=src/client/client.c
 
 .PHONY: all server client clean

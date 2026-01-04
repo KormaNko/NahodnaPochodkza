@@ -10,7 +10,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <stdlib.h>
-#include <time.h>
+#include "simulation.h"  
 
 typedef struct {
 
@@ -35,14 +35,18 @@ static void send_line(zdielaneData *ctx, const char *msg) {
     pthread_mutex_unlock(&ctx->send_lock);
 }
 
-
-
 void *cmd_thread(void *arg) {
     zdielaneData * data = (zdielaneData*)arg;
     char riadok[256];
     const char * spravaPreClienta;
 
     while(1) {
+
+        pthread_mutex_lock(&data->lock);
+        int run = data->running;
+        pthread_mutex_unlock(&data->lock);
+        if (!run) break;
+
         int info = siet_precitaj_riadok(data->fd,riadok,sizeof(riadok));
         if(info > 0){
         switch (protocol_parse_line(riadok))
@@ -50,13 +54,17 @@ void *cmd_thread(void *arg) {
         case PROTO_CMD_HELLO:
             spravaPreClienta = "CAU\n";
             break;
-        case PROTO_CMD_GET_STATE:
-            if(data->mode == 1){
-            spravaPreClienta = "JE NASTAVENY MODE INTERACTIVE\n";
-            }else {
-            spravaPreClienta = "JE NASTAVENY MODE SUMMARY\n";
-            }
+        case PROTO_CMD_GET_STATE: {
+            int cislo;
+            pthread_mutex_lock(&data->lock);
+            cislo = data->mode;
+            pthread_mutex_unlock(&data->lock);
+
+            spravaPreClienta = (cislo == 1)
+                ? "JE NASTAVENY MODE INTERACTIVE\n"
+                : "JE NASTAVENY MODE SUMMARY\n";
             break;
+        }
         case PROTO_CMD_MODE_INTERACTIVE:
             spravaPreClienta = "OK MODE INTERACTIVE\n";
             pthread_mutex_lock(&data->lock);
@@ -65,32 +73,84 @@ void *cmd_thread(void *arg) {
             break;  
         case PROTO_CMD_MODE_SUMMARY:
             spravaPreClienta = "OK MODE SUMMARY\n";
-             pthread_mutex_lock(&data->lock);
+            pthread_mutex_lock(&data->lock);
             data->mode = 0;
-             pthread_mutex_unlock(&data->lock);
+            pthread_mutex_unlock(&data->lock);
             break;   
         case PROTO_CMD_QUIT:
-            spravaPreClienta = "DOBRE MAJ SA\n";
             pthread_mutex_lock(&data->lock);
             data->running = 0;
             pthread_mutex_unlock(&data->lock);
-            return NULL;
-              
+            spravaPreClienta = "DOBRE MAJ SA\n";
+            break;
+
         default:
             spravaPreClienta = "TAKUTO SPRAVU NEPOZNAM\n";
             break; 
         }
         send_line(data,spravaPreClienta);        
-        }else if(info <= 0) {
+        } else if(info <= 0) {
+            pthread_mutex_lock(&data->lock);
             data->running = 0;
+            pthread_mutex_unlock(&data->lock);
             return NULL;
         }
     }
     return NULL;
 }
 
+static void *sim_thread(void *arg) {
+    zdielaneData *data = (zdielaneData*)arg;
+
+    const unsigned long tick_ms = 200;
+    unsigned long odPoslednehoKrokuCas = 0;
+
+    while (1) {
+        pthread_mutex_lock(&data->lock);
+        int run = data->running;
+        pthread_mutex_unlock(&data->lock);
+
+        if (!run) break;
+
+        usleep(tick_ms * 1000);
+
+        int mode;
+        int x, y;
+        unsigned long kroky;
+
+        pthread_mutex_lock(&data->lock);
+
+        
+        sim_step(data->cfg, &data->x, &data->y);
+        data->kroky += 1;
+
+        mode = data->mode;
+        y = data->y;
+        x = data->x;
+        kroky = data->kroky;
+
+        pthread_mutex_unlock(&data->lock);
+
+        char buf[128];
+        if (mode == 1) {
+            snprintf(buf, sizeof(buf), "UPDATE x=%d y=%d steps=%lu\n", x, y, kroky);
+            send_line(data, buf);
+        } else {
+            odPoslednehoKrokuCas += tick_ms;
+            if (odPoslednehoKrokuCas >= 1000) {
+                odPoslednehoKrokuCas = 0;
+                snprintf(buf, sizeof(buf), "SUMMARY x=%d y=%d steps=%lu\n", x, y, kroky);
+                send_line(data, buf);
+            }
+        }
+    }
+
+    return NULL;
+}
+
 int main(int argc, char **argv) {
-    
+    srand((unsigned)time(NULL));
+
     server_config cfg;
     if (config_parse(&cfg, argc, argv) != 0) {
         return 2;
@@ -100,14 +160,12 @@ int main(int argc, char **argv) {
 
     int pripajanie = siet_pocuvaj_tcp(port,8);
 
-    
-
     if(pripajanie < 0 ) {
         fprintf(stderr,"chyba");
         return 3;
     }
 
-    struct sigaction sa;    // tu v tomto odseku som si pomahal s copilotom
+    struct sigaction sa;    // no tento odsek je viacmenej cely z hlavy copilota snazil som zbavit mojej globalnej premenej a nevedel som to vymysliet
     memset(&sa,0,sizeof(sa));
     sa.sa_handler = ukoncenie;
     sigemptyset(&sa.sa_mask);
@@ -128,7 +186,7 @@ int main(int argc, char **argv) {
         return 5;                        
     }                                    
     sigemptyset(&empty);    
-        // tu ta cast konci
+    // tu ta cast konci
 
     printf("Cakam na pripojenie klienta na porte : %s\n",port);
     fflush(stdout);
@@ -146,15 +204,13 @@ int main(int argc, char **argv) {
             }                            
             perror("pselect");           
             break;                      
-        }                                
+        }
 
+        int prijaty = siet_prijmi_klienta(pripajanie); 
+        if(prijaty < 0) {
+            continue;
+        }
 
-           int prijaty = siet_prijmi_klienta(pripajanie); 
-            if(prijaty < 0) {
-                continue;
-            }
-    
-    
         zdielaneData data;
         pthread_mutex_init(&data.send_lock, NULL);
         pthread_mutex_init(&data.lock, NULL);   
@@ -165,18 +221,27 @@ int main(int argc, char **argv) {
         data.x = 0;
         data.y = 0;
         data.cfg = &cfg;
+
         pthread_t spracovanieSpravSKlientom;
+        pthread_t krokySimulacie;
+
         pthread_create(&spracovanieSpravSKlientom,NULL,cmd_thread,&data);
+        pthread_create(&krokySimulacie,NULL,sim_thread,&data);
 
         pthread_join(spracovanieSpravSKlientom,NULL);
+
+        // poistka, aby sa sim_thread ukoncil aj pri neocakavanom konci cmd_thread
+        pthread_mutex_lock(&data.lock);
+        data.running = 0;
+        pthread_mutex_unlock(&data.lock);
+
+        pthread_join(krokySimulacie,NULL);
+
         pthread_mutex_destroy(&data.send_lock);
-    pthread_mutex_destroy(&data.lock);
-     close(prijaty);  
+        pthread_mutex_destroy(&data.lock);
+        close(prijaty);  
     }
-     
-  
-   
-    
+
     close(pripajanie);
     printf("server: Server ukonceny");
     return 0;

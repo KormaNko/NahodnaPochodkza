@@ -1,5 +1,5 @@
 
-
+#include <string.h>
 #include "protokol.h"
 spravy protocol_parse_line(const char *riadok){
 
