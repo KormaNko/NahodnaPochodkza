@@ -16,7 +16,7 @@ int y;
 
 typedef struct  {
 policko_data *policko;        
-server_config *config;
+const server_config *config;
 unsigned long long  maxKrokov;
 }vlakno_args;
 

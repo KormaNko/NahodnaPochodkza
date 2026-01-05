@@ -6,7 +6,7 @@
 
 int config_parse(server_config *cfg, int argc, char **argv) {
     
-    if (argc != 9) {
+    if (argc != 10) {
         fprintf(stderr, "Pouzitie: %s <port> <W> <H> <K> <pU> <pD> <pL> <pR>\n", argv[0]);
         return 1;
     }

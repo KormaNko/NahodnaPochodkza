@@ -2,6 +2,7 @@
 
 #include <stdlib.h> 
 #include <pthread.h>
+#include <stdio.h>
 #define MAX_POCET_KROKOV 100000 // aby som tam nahodou neostal stucknuty vecne
 
 
@@ -73,7 +74,7 @@ unsigned long sim_kolko_krokov_kym_trafim(const server_config *cfg, int sx, int 
         unsigned long long suma_krokov = 0;
 
 
-        for (size_t i = 0; i < cfg->R; i++)
+        for (int i = 0; i < cfg->R; i++)
         {
             
             trafil += sim_dojst_do_stredu_za_K(cfg,sx,sy,K);
