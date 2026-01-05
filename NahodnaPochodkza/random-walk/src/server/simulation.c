@@ -1,4 +1,7 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include "simulation.h"
+#include <time.h>
 
 #include <stdlib.h> 
 #include <pthread.h>
@@ -181,7 +184,11 @@ void sim_interactive(const server_config *cfg,
                         send_fn("DOSIAHNUTY STRED\n", userdata);
                         break;
                     }
-                    usleep(tick_ms * 1000);
+                   struct timespec ts;
+ts.tv_sec = tick_ms / 1000;
+ts.tv_nsec = (tick_ms % 1000) * 1000 * 1000;
+nanosleep(&ts, NULL);
+
                 }
             }
         }

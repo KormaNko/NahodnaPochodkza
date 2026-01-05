@@ -1,3 +1,6 @@
+#define _POSIX_C_SOURCE 200809L
+#include <time.h>
+
 #include "net.h"
 #include <signal.h>
 #include <stdio.h>
@@ -139,7 +142,11 @@ static void *sim_thread(void *arg) {
             pthread_mutex_unlock(&data->lock);
         }
 
-        usleep(200 * 1000);
+        struct timespec ts;
+ts.tv_sec = 0;
+ts.tv_nsec = 200 * 1000 * 1000; // 200 ms
+nanosleep(&ts, NULL);
+
     }
     return NULL;
 }
