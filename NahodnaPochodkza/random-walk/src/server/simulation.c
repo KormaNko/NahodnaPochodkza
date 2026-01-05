@@ -20,23 +20,19 @@ void sim_step(const server_config *cfg, int *x, int *y) {
     *y = (*y % cfg->vyska + cfg->vyska) % cfg->vyska;
 }
 
-static void sim_get_center(const server_config *cfg, int *cx, int *cy) {
-*cx = cfg->sirka /2;
-*cy = cfg->vyska /2;
-}
+
 
 int sim_dojst_do_stredu_za_K(const server_config *cfg, int sx, int sy, int K) {
-    int cx,cy;
-    sim_get_center(cfg, &cx, &cy);
+   
     int x = sx, y = sy;
     
-    if(x == cx && cy == y) {
+    if(x == 0 && y == 0) {
         return 1;
     }
     int i = 1;
     while ( i <= K) {
         sim_step(cfg,&x,&y);
-        if(x == cx && cy == y) {
+        if(x == 0 && y == 0) {
         return 1;
     }
     i++;
@@ -45,17 +41,16 @@ int sim_dojst_do_stredu_za_K(const server_config *cfg, int sx, int sy, int K) {
 }
 
 unsigned long sim_kolko_krokov_kym_trafim(const server_config *cfg, int sx, int sy, unsigned long max_steps) {
-    int cx,cy;
-    sim_get_center(cfg, &cx, &cy);
+    
     int x = sx, y = sy;
-    if(x == cx && y == cy) {
+    if(x == 0 && y == 0) {
         return 0;
     }
     unsigned long i = 1;
     while ( i < max_steps) {
 
         sim_step(cfg,&x,&y);
-        if(x == cx && cy == y) {
+        if(x == 0 && 0 == y) {
         return i;
     }
     i++;
