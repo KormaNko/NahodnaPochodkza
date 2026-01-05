@@ -5,7 +5,8 @@ typedef struct {
     const char *port;   
     int sirka;
     int vyska;
-    int maxKrokov;
+    int K;
+    int R;
     double pU, pD, pL, pR;
 } server_config;
 

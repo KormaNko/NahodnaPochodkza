@@ -155,7 +155,21 @@ int main(int argc, char **argv) {
     if (config_parse(&cfg, argc, argv) != 0) {
         return 2;
     }
+
     config_print(&cfg);
+
+
+
+    int pocet = cfg.sirka * cfg.vyska;
+    policko_data matica[pocet];  
+    sim_vypocitaj_maticu(&cfg, matica);
+
+    printf("Pravdepodobnost:\n");
+    sim_vypis_maticu(&cfg, matica, 0);
+
+    printf("\nPriemer krokov:\n");
+    sim_vypis_maticu(&cfg, matica, 1);
+
     const char * port = cfg.port;
 
     int pripajanie = siet_pocuvaj_tcp(port,8);

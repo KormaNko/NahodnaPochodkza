@@ -14,14 +14,14 @@ int config_parse(server_config *cfg, int argc, char **argv) {
     cfg->port = argv[1];
     cfg->sirka = atoi(argv[2]);
     cfg->vyska = atoi(argv[3]);
-    cfg->maxKrokov = atoi(argv[4]);
+    cfg->K = atoi(argv[4]);
+    cfg->R = atoi(argv[5]);
+    cfg->pU = strtod(argv[6], NULL);
+    cfg->pD = strtod(argv[7], NULL);
+    cfg->pL = strtod(argv[8], NULL);
+    cfg->pR = strtod(argv[9], NULL);
 
-    cfg->pU = strtod(argv[5], NULL);
-    cfg->pD = strtod(argv[6], NULL);
-    cfg->pL = strtod(argv[7], NULL);
-    cfg->pR = strtod(argv[8], NULL);
-
-    if (cfg->sirka <= 0 || cfg->vyska <= 0 || cfg->maxKrokov <= 0) {
+    if (cfg->sirka <= 0 || cfg->vyska <= 0 || cfg->K <= 0) {
         fprintf(stderr, "Chyba: W, H, K musia byt kladne cele cisla.\n");
         return 2;
     }
@@ -42,6 +42,6 @@ int config_parse(server_config *cfg, int argc, char **argv) {
 
 void config_print(const server_config *cfg) {
     printf("CONFIG port=%s W=%d H=%d K=%d pU=%.6f pD=%.6f pL=%.6f pR=%.6f\n",
-           cfg->port, cfg->sirka, cfg->vyska, cfg->maxKrokov, cfg->pU, cfg->pD, cfg->pL, cfg->pR);
+           cfg->port, cfg->sirka, cfg->vyska, cfg->K, cfg->pU, cfg->pD, cfg->pL, cfg->pR);
     fflush(stdout);
 }
