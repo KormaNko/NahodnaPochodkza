@@ -41,4 +41,11 @@ void sim_vypis_maticu(
     const policko_data *matica,int type
 );
 
+char *sim_matica_string(const server_config *cfg, const policko_data *matica, int type);
+
+
+typedef void (*sim_update_cb)(const char *line, void *userdata);
+
+void sim_interactive(const server_config *cfg,
+                     sim_update_cb send_fn, void *userdata);
 #endif

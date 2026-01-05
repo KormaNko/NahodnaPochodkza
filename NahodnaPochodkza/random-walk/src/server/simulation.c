@@ -3,6 +3,8 @@
 #include <stdlib.h> 
 #include <pthread.h>
 #include <stdio.h>
+#include <string.h>
+#include <unistd.h>
 #define MAX_POCET_KROKOV 100000 // aby som tam nahodou neostal stucknuty vecne
 
 
@@ -124,6 +126,69 @@ void sim_vypis_maticu(const server_config *cfg, const policko_data *matica, int 
         printf("\n");
     }
 }
+
+
+char *sim_matica_string(const server_config *cfg, const policko_data *matica, int type) {
+    
+    int sirka = cfg->sirka, vyska = cfg->vyska;
+    size_t estimate = (sirka * 8 + 3) * vyska + 1;
+    char *vystup = malloc(estimate);
+    if (!vystup) return NULL;
+
+    vystup[0] = '\0';
+    char riadok[256];
+    for (int y = 0; y < vyska; ++y) {
+        riadok[0] = '\0';
+        for (int x = 0; x < sirka; ++x) {
+            int idx = y * sirka + x;
+            char tmp[32];
+            if (type == 0)
+                snprintf(tmp, sizeof(tmp), "%5.3lf ", matica[idx].stats.p_hit_within_K);
+            else
+                snprintf(tmp, sizeof(tmp), "%5.2lf ", matica[idx].stats.avg_steps_to_hit);
+            strcat(riadok, tmp);
+        }
+        strcat(riadok, "\n");
+        strcat(vystup, riadok);
+    }
+    return vystup;
+}
+void sim_interactive(const server_config *cfg,
+                     sim_update_cb send_fn, void *userdata)
+{
+    const unsigned long tick_ms = 200;
+    unsigned R = cfg->R;
+    unsigned K = cfg->K;
+    for (int start_y = 0; start_y < cfg->vyska; ++start_y) {
+        for (int start_x = 0; start_x < cfg->sirka; ++start_x) {
+            for (unsigned rep = 0; rep < R; ++rep) {
+                int x = start_x, y = start_y;
+                unsigned kroky = 0;
+                char info[128];
+                snprintf(info, sizeof(info), "REPLIKACIA %u/%u Z POLICKA [%d,%d]\n",
+                         rep+1, R, start_x, start_y);
+                send_fn(info, userdata);
+
+                for (unsigned k = 0; k < K; ++k) {
+                    kroky++;
+                    sim_step(cfg, &x, &y);
+                    char buf[128];
+                    snprintf(buf, sizeof(buf), "UPDATE start_x=%d start_y=%d rep=%u krok=%u x=%d y=%d\n",
+                             start_x, start_y, rep+1, kroky, x, y);
+                    send_fn(buf, userdata);
+
+                    if (x == 0 && y == 0) {
+                        send_fn("DOSIAHNUTY STRED\n", userdata);
+                        break;
+                    }
+                    usleep(tick_ms * 1000);
+                }
+            }
+        }
+    }
+    send_fn("INTERACTIVE MOD KONCI (vsetky replikacie hotove)\n", userdata);
+}
+
 
 
 
