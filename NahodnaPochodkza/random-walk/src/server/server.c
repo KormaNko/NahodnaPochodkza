@@ -1,6 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include <time.h>
-
+#define PORT 12345
 #include "net.h"
 #include <signal.h>
 #include <stdio.h>
@@ -25,6 +25,8 @@ typedef struct {
     pthread_mutex_t send_lock;
     const server_config *cfg;
     policko_data *matica;
+
+    nacitavanie prekazky;
 } zdielaneData;
 
 
@@ -97,9 +99,67 @@ void *cmd_thread(void *arg) {
                     send_line(data, vystup);
                     free(vystup);
                 } else {
+
                     send_line(data, "Chyba pri citani volby summary.\n");
                 }
                 break;
+                        case PROTO_CMD_MODE_OBSTACLES: {
+                            uvolni_prekazky(&data->prekazky);
+                char subor[128];
+
+                if (sscanf(riadok, "MODE OBSTACLES %127s", subor) != 1) {
+                    send_line(data, "ERROR ZLY FORMAT\n");
+                    break;
+                }
+
+                if (nacitaj_prekazky(subor, &data->prekazky) != 0) {
+                    send_line(data, "ERROR PREKAZKY NENACITANE\n");
+                    break;
+                }
+                /* uvolni staru maticu */
+                /* ===== PREPOCET SVETA S PREKAZKAMI ===== */
+pthread_mutex_lock(&data->lock);
+
+/* uvolni staru maticu */
+                    if (data->matica) {
+                        free(data->matica);
+                        data->matica = NULL;
+                    }
+
+                    /* alokuj novu */
+                    int pocet = data->cfg->sirka * data->cfg->vyska;
+                    data->matica = malloc(sizeof(policko_data) * pocet);
+                    if (!data->matica) {
+                        pthread_mutex_unlock(&data->lock);
+                        send_line(data, "ERROR ALOKACIA MATICE\n");
+                        break;
+                    }
+
+                    pthread_mutex_unlock(&data->lock);
+
+                    /* vypocitaj maticu MIMO mutexu (dlha operacia) */
+                    sim_vypocitaj_maticu(data->cfg, &data->prekazky, data->matica);
+
+                    send_line(data, "OK MATICA PREPOCITANA\n");
+
+                if (!data->matica) {
+                    send_line(data, "ERROR ALOKACIA MATICE\n");
+                    break;
+                }
+
+                /* PREPOCITAJ MATICU – TU JE KLUC */
+                sim_vypocitaj_maticu(
+                    data->cfg,
+                    &data->prekazky,   // 👈 TERAZ JU MAS
+                    data->matica
+                );
+
+                send_line(data, "OK MATICA PREPOCITANA\n");
+
+                data->prekazky.mod_prekazok = 1;
+                send_line(data, "OK MOD S PREKAZKAMI\n");
+                break;
+            }
             case PROTO_CMD_QUIT:
                 pthread_mutex_lock(&data->lock);
                 data->running = 0;
@@ -134,7 +194,7 @@ static void *sim_thread(void *arg) {
 
         if (mode == 1) {
             
-            sim_interactive(data->cfg, simulation_update_writer, data);
+            sim_interactive(data->cfg, simulation_update_writer, data,&data->prekazky);
 
             
             pthread_mutex_lock(&data->lock);
@@ -144,29 +204,45 @@ static void *sim_thread(void *arg) {
 
         struct timespec ts;
 ts.tv_sec = 0;
-ts.tv_nsec = 200 * 1000 * 1000; // 200 ms
+ts.tv_nsec = 200 * 1000 * 1000; 
 nanosleep(&ts, NULL);
 
     }
     return NULL;
+}
+void uvolni_prekazky(nacitavanie *n)
+{
+    if (!n || !n->prekazky)
+        return;
+
+    for (int y = 0; y < n->vyska; y++)
+        free(n->prekazky[y]);
+
+    free(n->prekazky);
+    n->prekazky = NULL;
+    n->mod_prekazok = 0;
 }
 
 
 int main(int argc, char **argv) {
     srand((unsigned)time(NULL));
 
+
+
+
+
+
     server_config cfg;
+
     if (config_parse(&cfg, argc, argv) != 0) {
         return 2;
     }
 
     config_print(&cfg);
 
-    int pocet = cfg.sirka * cfg.vyska;
-    policko_data matica[pocet];
-    sim_vypocitaj_maticu(&cfg, matica);
+    
 
-    const char *port = cfg.port;
+    const char *port = PORT;
     int pripajanie = siet_pocuvaj_tcp(port, 8);
 
     if (pripajanie < 0) {
@@ -229,7 +305,25 @@ int main(int argc, char **argv) {
         data.x = 0;
         data.y = 0;
         data.cfg = &cfg;
-        data.matica = matica;
+        data.matica = NULL;
+
+
+
+        pthread_mutex_lock(&data.lock);
+
+        int pocet = cfg.sirka * cfg.vyska;
+        data.matica = malloc(sizeof(policko_data) * pocet);
+        if (!data.matica) {
+            pthread_mutex_unlock(&data.lock);
+            close(prijaty);
+            continue;
+        }
+
+        pthread_mutex_unlock(&data.lock);
+
+
+        sim_vypocitaj_maticu(&cfg, NULL, data.matica);
+
 
         pthread_t spracovanieSpravSKlientom;
         pthread_t krokySimulacie;
@@ -246,6 +340,7 @@ int main(int argc, char **argv) {
 
         pthread_mutex_destroy(&data.send_lock);
         pthread_mutex_destroy(&data.lock);
+        uvolni_prekazky(&data.prekazky);
         close(prijaty);
     }
 
@@ -253,3 +348,24 @@ int main(int argc, char **argv) {
     printf("server: Server ukonceny\n");
     return 0;
 }
+
+
+int nacitaj_prekazky(const char *subor, nacitavanie *n) {
+    FILE *f = fopen(subor, "r");
+    if (!f) return -1;
+
+    fscanf(f, "%d %d", &n->sirka, &n->vyska);
+
+    n->prekazky = malloc(n->vyska * sizeof(int *));
+    for (int y = 0; y < n->vyska; y++) {
+        n->prekazky[y] = malloc(n->sirka * sizeof(int));
+        for (int x = 0; x < n->sirka; x++) {
+            fscanf(f, "%d", &n->prekazky[y][x]);
+        }
+    }
+
+    fclose(f);
+    n->mod_prekazok = 1;
+    return 0;
+}
+

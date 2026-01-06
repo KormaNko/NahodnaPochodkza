@@ -2,25 +2,7 @@
 
 #include "string.h"
 #include "protokol.h"
-spravy protocol_parse_line(const char *riadok){
 
-if(strcmp(riadok,"HELLO\n") == 0) {
-        return PROTO_CMD_HELLO;
-        }else if(strcmp(riadok,"QUIT\n") == 0) {
-            return PROTO_CMD_QUIT;
-        }else if(strcmp(riadok,"MODE INTERACTIVE\n") == 0)
-         {
-            return PROTO_CMD_MODE_INTERACTIVE;
-         }else if(strcmp(riadok,"MODE SUMMARY\n") == 0)
-         {
-           return PROTO_CMD_MODE_SUMMARY;
-         }else if(strcmp(riadok,"GET STATE\n") == 0)
-         {
-            return PROTO_CMD_GET_STATE;
-            }else{ 
-            return PROTO_CMD_UNKNOWN;
-         }
-}
 
 const char * protocol_cmd_name(spravy cmd) {
     switch (cmd)
@@ -44,4 +26,28 @@ const char * protocol_cmd_name(spravy cmd) {
         return "UNKNOWN\n";
         break;
     }
+}
+
+spravy protocol_parse_line(const char *line)
+{
+    if (strcmp(line, "HELLO\n") == 0)
+        return PROTO_CMD_HELLO;
+
+    if (strcmp(line, "QUIT\n") == 0)
+        return PROTO_CMD_QUIT;
+
+    if (strcmp(line, "MODE INTERACTIVE\n") == 0)
+        return PROTO_CMD_MODE_INTERACTIVE;
+
+    if (strcmp(line, "MODE SUMMARY\n") == 0)
+        return PROTO_CMD_MODE_SUMMARY;
+
+    if (strcmp(line, "GET STATE\n") == 0)
+        return PROTO_CMD_GET_STATE;
+
+   if (strncmp(line, "MODE OBSTACLES ", 15) == 0)
+    return PROTO_CMD_MODE_OBSTACLES;
+
+
+    return PROTO_CMD_UNKNOWN;
 }

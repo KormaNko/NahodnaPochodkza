@@ -9,11 +9,11 @@
 int config_parse(server_config *cfg, int argc, char **argv) {
     
     if (argc != 10) {
-        fprintf(stderr, "Pouzitie: %s <port> <W> <H> <K> <pU> <pD> <pL> <pR>\n", argv[0]);
+        fprintf(stderr, "Pouzitie: %s <subor> <W> <H> <K> <pU> <pD> <pL> <pR>\n", argv[0]);
         return 1;
     }
 
-    cfg->port = argv[1];
+    cfg->subor = argv[1];
     cfg->sirka = atoi(argv[2]);
     cfg->vyska = atoi(argv[3]);
     cfg->K = atoi(argv[4]);
@@ -44,6 +44,6 @@ int config_parse(server_config *cfg, int argc, char **argv) {
 
 void config_print(const server_config *cfg) {
     printf("CONFIG port=%s W=%d H=%d K=%d pU=%.6f pD=%.6f pL=%.6f pR=%.6f\n",
-           cfg->port, cfg->sirka, cfg->vyska, cfg->K, cfg->pU, cfg->pD, cfg->pL, cfg->pR);
+           cfg->subor, cfg->sirka, cfg->vyska, cfg->K, cfg->pU, cfg->pD, cfg->pL, cfg->pR);
     fflush(stdout);
 }
