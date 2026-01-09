@@ -1,8 +1,9 @@
 #ifndef CONFIG_H
+#include <stddef.h>
 #define CONFIG_H
 
 typedef struct {
-    const char *port;   
+    const char *suborVystup;   
     int sirka;
     int vyska;
     int K;
@@ -13,6 +14,7 @@ typedef struct {
 
 int config_parse(server_config *cfg, int argc, char **argv);
 
+void NacitajConfig(char *out, size_t out_size);
 
 void config_print(const server_config *cfg);
 

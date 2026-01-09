@@ -5,7 +5,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 
-
+#include "config.h"
 
 
 typedef struct  {
@@ -32,20 +32,30 @@ void * prijmac_sprav_od_servera(void * arg) {
     return NULL;
 }
 
-int main(int argc, char **argv) {
-    if (argc != 3) {
-        printf("chyba\n");
-        return 2;
-    }
 
-    const char * host = argv[1];
-    const char * port = argv[2];
+
+
+
+int main(void) {
+   
+
+    const char * host = "127.0.0.1";
+    const char * port = "66666";
     int pripojenie = siet_pripoj_sa_tcp(host,port);
     if(pripojenie < 0) {
         printf("Nepodarilo sa pripojit\n");
         return 1;
     }
     
+
+    char config_line[256];
+    NacitajConfig(config_line, sizeof(config_line));
+
+
+    char msg[300];
+    snprintf(msg, sizeof(msg), "CONFIG %s\n", config_line);
+    siet_posli_vsetko(pripojenie, msg, strlen(msg));
+
     pthread_t komunikaciaServer;
     spolocneData sp;
     sp.fd = pripojenie;

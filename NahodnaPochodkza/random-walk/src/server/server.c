@@ -65,7 +65,7 @@ void *cmd_thread(void *arg) {
     const char *spravaPreClienta;
 
             while (1) {
-            /* 1️⃣ najprv skontroluj flagy */
+            
             pthread_mutex_lock(&data->lock);
             int run = data->running;
             pthread_mutex_unlock(&data->lock);
@@ -73,7 +73,7 @@ void *cmd_thread(void *arg) {
             if (!run || !server_running)
                 break;
 
-            /* 2️⃣ čakaj na dáta s timeoutom */
+           
             fd_set rfds;
             struct timeval tv;
 
@@ -81,19 +81,19 @@ void *cmd_thread(void *arg) {
             FD_SET(data->fd, &rfds);
 
             tv.tv_sec = 0;
-            tv.tv_usec = 200000;  // 200 ms
+            tv.tv_usec = 200000; 
 
             int r = select(data->fd + 1, &rfds, NULL, NULL, &tv);
             if (r < 0) {
-                /* chyba alebo signál */
+               
                 break;
             }
             if (r == 0) {
-                /* timeout – skontroluj flagy znovu */
+                
                 continue;
             }
 
-            /* 3️⃣ socket je ready → teraz čítaj */
+           
             int info = siet_precitaj_riadok(data->fd, riadok, sizeof(riadok));
             if (info <= 0) {
                 pthread_mutex_lock(&data->lock);
@@ -215,7 +215,7 @@ int main(int argc, char **argv) {
     policko_data matica[pocet];
     sim_vypocitaj_maticu(&cfg, matica);
 
-    const char *port = cfg.port;
+    const char *port = "66666";
     int pripajanie = siet_pocuvaj_tcp(port, 8);
 
     if (pripajanie < 0) {
