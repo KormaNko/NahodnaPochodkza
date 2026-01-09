@@ -5,6 +5,9 @@
 #include <pthread.h>
 #include <stdlib.h>
 
+
+
+
 typedef struct  {
     int fd;
 }spolocneData;

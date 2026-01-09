@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include <time.h>
+#include <sys/select.h>
 
 #include "net.h"
 #include <signal.h>
@@ -15,6 +16,10 @@
 #include <stdlib.h>
 #include "simulation.h"
 
+
+static volatile sig_atomic_t server_running = 1;
+
+
 typedef struct {
     int fd;
     int running;
@@ -28,7 +33,11 @@ typedef struct {
 } zdielaneData;
 
 
-static void ukoncenie(int sig) { (void)sig; }
+static void ukoncenie(int sig) {
+    (void)sig;
+    server_running = 0;
+}
+
 
 static void send_line(zdielaneData *ctx, const char *msg) {
     pthread_mutex_lock(&ctx->send_lock);
@@ -55,13 +64,43 @@ void *cmd_thread(void *arg) {
     char riadok[256];
     const char *spravaPreClienta;
 
-    while (1) {
-        pthread_mutex_lock(&data->lock);
-        int run = data->running;
-        pthread_mutex_unlock(&data->lock);
-        if (!run) break;
+            while (1) {
+            /* 1️⃣ najprv skontroluj flagy */
+            pthread_mutex_lock(&data->lock);
+            int run = data->running;
+            pthread_mutex_unlock(&data->lock);
 
-        int info = siet_precitaj_riadok(data->fd, riadok, sizeof(riadok));
+            if (!run || !server_running)
+                break;
+
+            /* 2️⃣ čakaj na dáta s timeoutom */
+            fd_set rfds;
+            struct timeval tv;
+
+            FD_ZERO(&rfds);
+            FD_SET(data->fd, &rfds);
+
+            tv.tv_sec = 0;
+            tv.tv_usec = 200000;  // 200 ms
+
+            int r = select(data->fd + 1, &rfds, NULL, NULL, &tv);
+            if (r < 0) {
+                /* chyba alebo signál */
+                break;
+            }
+            if (r == 0) {
+                /* timeout – skontroluj flagy znovu */
+                continue;
+            }
+
+            /* 3️⃣ socket je ready → teraz čítaj */
+            int info = siet_precitaj_riadok(data->fd, riadok, sizeof(riadok));
+            if (info <= 0) {
+                pthread_mutex_lock(&data->lock);
+                data->running = 0;
+                pthread_mutex_unlock(&data->lock);
+                break;
+            }
         if (info > 0) {
             switch (protocol_parse_line(riadok)) {
             case PROTO_CMD_HELLO:
@@ -133,18 +172,28 @@ static void *sim_thread(void *arg) {
         if (!run) break;
 
         if (mode == 1) {
-            
-            sim_interactive(data->cfg, simulation_update_writer, data);
+                        
+                       
+                        /* simulácia beží */
+                sim_interactive(data->cfg, simulation_update_writer, data);
+                /* simulácia SKONČILA */
 
-            
-            pthread_mutex_lock(&data->lock);
-            data->mode = 0;
-            pthread_mutex_unlock(&data->lock);
+                /* ukonči session */
+                pthread_mutex_lock(&data->lock);
+                data->running = 0;
+                data->mode = 0;
+                pthread_mutex_unlock(&data->lock);
+
+                /* AKTÍVNE UKONČI SPOJENIE – zobudí cmd_thread */
+                
+
+                /* ukonči server */
+                server_running = 0;
         }
 
         struct timespec ts;
 ts.tv_sec = 0;
-ts.tv_nsec = 200 * 1000 * 1000; // 200 ms
+ts.tv_nsec = 200 * 1000 * 1000; 
 nanosleep(&ts, NULL);
 
     }
@@ -186,30 +235,20 @@ int main(int argc, char **argv) {
         return 4;
     }
 
-    sigset_t blocked;
-    sigset_t empty;
-    sigemptyset(&blocked);
-    sigaddset(&blocked, SIGINT);
-    if (sigprocmask(SIG_BLOCK, &blocked, NULL) < 0) {
-        perror("sigprocmask");
-        close(pripajanie);
-        return 5;
-    }
-    sigemptyset(&empty);
+    
 
     printf("Cakam na pripojenie klienta na porte : %s\n", port);
     fflush(stdout);
 
-    while (1) {
+        while (server_running) {
         fd_set rfds;
         FD_ZERO(&rfds);
         FD_SET(pripajanie, &rfds);
 
-        int r = pselect(pripajanie + 1, &rfds, NULL, NULL, NULL, &empty);
+        int r = pselect(pripajanie + 1, &rfds, NULL, NULL, NULL, NULL);
         if (r < 0) {
-            if (errno == EINTR) {
-                break;
-            }
+            if (errno == EINTR)
+                continue;
             perror("pselect");
             break;
         }
@@ -218,6 +257,8 @@ int main(int argc, char **argv) {
         if (prijaty < 0) {
             continue;
         }
+
+        printf("Uspesne som pripojil klienta\n");
 
         zdielaneData data;
         pthread_mutex_init(&data.send_lock, NULL);
@@ -233,23 +274,29 @@ int main(int argc, char **argv) {
 
         pthread_t spracovanieSpravSKlientom;
         pthread_t krokySimulacie;
+
         pthread_create(&spracovanieSpravSKlientom, NULL, cmd_thread, &data);
-        pthread_create(&krokySimulacie, NULL, sim_thread, &data);
+            pthread_create(&krokySimulacie, NULL, sim_thread, &data);
 
-        pthread_join(spracovanieSpravSKlientom, NULL);
 
-     
-        pthread_mutex_lock(&data.lock);
-        data.running = 0;
-        pthread_mutex_unlock(&data.lock);
-        pthread_join(krokySimulacie, NULL);
+            pthread_join(krokySimulacie, NULL);
 
-        pthread_mutex_destroy(&data.send_lock);
-        pthread_mutex_destroy(&data.lock);
-        close(prijaty);
+
+            close(prijaty);
+
+
+            pthread_join(spracovanieSpravSKlientom, NULL);
+
+
+            pthread_mutex_destroy(&data.send_lock);
+            pthread_mutex_destroy(&data.lock);
+
+        
     }
+
 
     close(pripajanie);
     printf("server: Server ukonceny\n");
     return 0;
+
 }
