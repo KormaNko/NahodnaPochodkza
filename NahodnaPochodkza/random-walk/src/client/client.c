@@ -4,20 +4,36 @@
 #include "net.h"
 #include <pthread.h>
 #include <stdlib.h>
-
+#include <sys/socket.h>
 #include "config.h"
-
-
+#include <errno.h> 
+#include <sys/select.h>
 typedef struct  {
     int fd;
+    int running;
+    pthread_mutex_t lock;
 }spolocneData;
 
 void * prijmac_sprav_od_servera(void * arg) {
     spolocneData * sp = (spolocneData*)arg;
-    int cisloSocket = sp->fd;
     char riadok[512];
     while(1) {
-        int info = siet_precitaj_riadok(cisloSocket,riadok,sizeof(riadok));
+        pthread_mutex_lock(&sp->lock);
+        int run = sp->running;
+        pthread_mutex_unlock(&sp->lock);
+
+        if (!run)
+            break;
+
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        FD_SET(sp->fd, &rfds);
+
+       int r = select(sp->fd + 1, &rfds, NULL, NULL, NULL);
+    if (r <= 0)
+    continue;
+
+        int info = siet_precitaj_riadok(sp->fd,riadok,sizeof(riadok));
         if(info > 0){
             printf("%s", riadok);
             fflush(stdout);
@@ -25,12 +41,17 @@ void * prijmac_sprav_od_servera(void * arg) {
             printf("Server ukoncil komunikaciu\n");
             break;
         }else {
-            printf("chyba\n");
+            if (errno == EBADF || errno == EINTR) {
+                break;   
+            }
+            perror("read");
             break;
         }
     }
+     
     return NULL;
 }
+
 
 
 
@@ -56,7 +77,7 @@ int main(void) {
     sleep(1); 
 
     const char * host = "127.0.0.1";
-    const char * port = "66666";
+    const char * port = "77777";
     int pripojenie = siet_pripoj_sa_tcp(host,port);
     if(pripojenie < 0) {
         printf("Nepodarilo sa pripojit\n");
@@ -74,8 +95,11 @@ int main(void) {
 
     pthread_t komunikaciaServer;
     spolocneData sp;
+    
     sp.fd = pripojenie;
-
+    sp.running = 1;
+    pthread_mutex_init(&sp.lock, NULL);
+    
     if(pthread_create(&komunikaciaServer,NULL,prijmac_sprav_od_servera,&sp) != 0) {
         close(pripojenie);
         return 5;
@@ -142,8 +166,14 @@ int main(void) {
             break;
         }
     }
+    
+  pthread_mutex_lock(&sp.lock);
+sp.running = 0;
+pthread_mutex_unlock(&sp.lock);
 
-    pthread_join(komunikaciaServer,NULL);
-    close(pripojenie);
+shutdown(sp.fd, SHUT_RDWR);
+pthread_join(komunikaciaServer, NULL);
+close(sp.fd);
+pthread_mutex_destroy(&sp.lock);
     return 0;
 }

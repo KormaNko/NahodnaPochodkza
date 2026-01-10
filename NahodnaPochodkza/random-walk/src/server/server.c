@@ -195,7 +195,7 @@ nanosleep(&ts, NULL);
 
 
 int main(void) {
-    int listen_fd = siet_pocuvaj_tcp("66666", 1);
+    int listen_fd = siet_pocuvaj_tcp("77777", 1);
     int fd = siet_prijmi_klienta(listen_fd);
 
     char line[512];

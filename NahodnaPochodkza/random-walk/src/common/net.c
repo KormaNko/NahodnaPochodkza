@@ -49,6 +49,9 @@ int siet_precitaj_riadok(int identifikator, char *buf, size_t buf_sz) {
                 if(errno == EINTR) {
                     continue;
                 }
+                if (errno == ECONNRESET) {
+                    return 0;    
+                }
                 perror("read");
                 return -1;
         }else if(navratova  == 1) {
