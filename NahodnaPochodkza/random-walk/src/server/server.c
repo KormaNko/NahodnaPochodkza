@@ -210,7 +210,7 @@ int main(void) {
         return 1;
 
     vytvor_server(&cfg, fd);
-
+    free((void *)cfg.suborVystup);
     close(listen_fd);
     return 0;
 }

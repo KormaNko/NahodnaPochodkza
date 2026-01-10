@@ -72,17 +72,25 @@ int main(void) {
         perror("exec");
         exit(1);
     }
-
+    const char * host = "127.0.0.1";
+    const char * port = "77777";
 
     sleep(1); 
 
-    const char * host = "127.0.0.1";
-    const char * port = "77777";
-    int pripojenie = siet_pripoj_sa_tcp(host,port);
-    if(pripojenie < 0) {
-        printf("Nepodarilo sa pripojit\n");
-        return 1;
-    }
+    
+    int pripojenie = -1;
+
+for (int i = 0; i < 50; i++) {         
+    pripojenie = siet_pripoj_sa_tcp(host, port);
+    if (pripojenie >= 0)
+        break;
+    sleep(1);                   
+}
+
+if (pripojenie < 0) {
+    fprintf(stderr, "Nepodarilo sa pripojit k serveru\n");
+    return 1;
+}
     
 
     char config_line[256];
