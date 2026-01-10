@@ -156,8 +156,12 @@ char *sim_matica_string(const server_config *cfg, const policko_data *matica, in
     }
     return vystup;
 }
-void sim_interactive(const server_config *cfg,
-                     sim_update_cb send_fn, void *userdata)
+void sim_interactive(
+    const server_config *cfg,
+    void (*writer)(const char *, void *),
+    simulation_should_stop_cb should_stop,
+    void *userdata
+)
 {
     const unsigned long tick_ms = 200;
     unsigned R = cfg->R;
@@ -165,23 +169,27 @@ void sim_interactive(const server_config *cfg,
     for (int start_y = 0; start_y < cfg->vyska; ++start_y) {
         for (int start_x = 0; start_x < cfg->sirka; ++start_x) {
             for (unsigned rep = 0; rep < R; ++rep) {
+                if (should_stop && should_stop(userdata))
+        return;
                 int x = start_x, y = start_y;
                 unsigned kroky = 0;
                 char info[128];
                 snprintf(info, sizeof(info), "REPLIKACIA %u/%u Z POLICKA [%d,%d]\n",
                          rep+1, R, start_x, start_y);
-                send_fn(info, userdata);
+                writer(info, userdata);
 
                 for (unsigned k = 0; k < K; ++k) {
+                    if (should_stop && should_stop(userdata))
+        return;
                     kroky++;
                     sim_step(cfg, &x, &y);
                     char buf[128];
                     snprintf(buf, sizeof(buf), "UPDATE start_x=%d start_y=%d rep=%u krok=%u x=%d y=%d\n",
                              start_x, start_y, rep+1, kroky, x, y);
-                    send_fn(buf, userdata);
+                    writer(buf, userdata);
 
                     if (x == 0 && y == 0) {
-                        send_fn("DOSIAHNUTY STRED\n", userdata);
+                        writer("DOSIAHNUTY STRED\n", userdata);
                         break;
                     }
                    struct timespec ts;
@@ -193,7 +201,7 @@ nanosleep(&ts, NULL);
             }
         }
     }
-    send_fn("INTERACTIVE MOD KONCI (vsetky replikacie hotove)\n", userdata);
+    writer("INTERACTIVE MOD KONCI (vsetky replikacie hotove)\n", userdata);
 }
 
 

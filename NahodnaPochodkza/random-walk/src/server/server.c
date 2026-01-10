@@ -28,6 +28,7 @@ typedef struct {
     int running;
     int mode;
     int x, y;
+    int stop_requested;
     unsigned long kroky;
     pthread_mutex_t lock;
     pthread_mutex_t send_lock;
@@ -40,7 +41,15 @@ static void ukoncenie(int sig) {
     (void)sig;
     server_running = 0;
 }
+static int simulation_should_stop(void *userdata) {
+    zdielaneData *data = (zdielaneData *)userdata;
 
+    pthread_mutex_lock(&data->lock);
+    int stop = data->stop_requested;
+    pthread_mutex_unlock(&data->lock);
+
+    return stop;
+}
 
 static void send_line(zdielaneData *ctx, const char *msg) {
     pthread_mutex_lock(&ctx->send_lock);
@@ -148,6 +157,14 @@ void *cmd_thread(void *arg) {
                 pthread_mutex_unlock(&data->lock);
                 spravaPreClienta = "DOBRE MAJ SA\n";
                 break;
+            case PROTO_CMD_STOP:
+                pthread_mutex_lock(&data->lock);
+                data->stop_requested = 1;
+                data->running = 0;
+                pthread_mutex_unlock(&data->lock);
+
+                spravaPreClienta = "SERVER ZASTAVENY\n";
+                break;
             default:
                 spravaPreClienta = "TAKUTO SPRAVU NEPOZNAM\n";
                 break;
@@ -175,7 +192,12 @@ static void *sim_thread(void *arg) {
         if (!run) break;
 
         if (mode == 1) {         
-                sim_interactive(data->cfg, simulation_update_writer, data); 
+                sim_interactive(
+    data->cfg,
+    simulation_update_writer,
+    simulation_should_stop,
+    data
+);
                 pthread_mutex_lock(&data->lock);
                 data->running = 0;
                 data->mode = 0;
@@ -247,6 +269,7 @@ int main(void) {
     data.y = 0;
     data.cfg = cfg;
     data.matica = matica;
+    data.stop_requested = 0;
 
     pthread_t spracovanieSpravSKlientom;
     pthread_t krokySimulacie;

@@ -46,6 +46,12 @@ char *sim_matica_string(const server_config *cfg, const policko_data *matica, in
 
 typedef void (*sim_update_cb)(const char *line, void *userdata);
 
-void sim_interactive(const server_config *cfg,
-                     sim_update_cb send_fn, void *userdata);
+typedef int (*simulation_should_stop_cb)(void *userdata);
+
+void sim_interactive(
+    const server_config *cfg,
+    void (*writer)(const char *, void *),
+    simulation_should_stop_cb should_stop,
+    void *userdata
+);
 #endif
