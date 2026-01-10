@@ -17,6 +17,9 @@
 #include "simulation.h"
 
 
+
+static int vytvor_server(const server_config *cfg, int fd);
+
 static volatile sig_atomic_t server_running = 1;
 
 
@@ -171,23 +174,12 @@ static void *sim_thread(void *arg) {
 
         if (!run) break;
 
-        if (mode == 1) {
-                        
-                       
-                        /* simulácia beží */
-                sim_interactive(data->cfg, simulation_update_writer, data);
-                /* simulácia SKONČILA */
-
-                /* ukonči session */
+        if (mode == 1) {         
+                sim_interactive(data->cfg, simulation_update_writer, data); 
                 pthread_mutex_lock(&data->lock);
                 data->running = 0;
                 data->mode = 0;
                 pthread_mutex_unlock(&data->lock);
-
-                /* AKTÍVNE UKONČI SPOJENIE – zobudí cmd_thread */
-                
-
-                /* ukonči server */
                 server_running = 0;
         }
 
@@ -201,102 +193,77 @@ nanosleep(&ts, NULL);
 }
 
 
-int main(int argc, char **argv) {
-    srand((unsigned)time(NULL));
+
+int main(void) {
+    int listen_fd = siet_pocuvaj_tcp("66666", 1);
+    int fd = siet_prijmi_klienta(listen_fd);
+
+    char line[512];
+    if (siet_precitaj_riadok(fd, line, sizeof(line)) <= 0)
+        return 1;
+
+    if (strncmp(line, "CONFIG ", 7) != 0)
+        return 1;
 
     server_config cfg;
-    if (config_parse(&cfg, argc, argv) != 0) {
-        return 2;
-    }
+    if (config_parse_string(&cfg, line + 7) != 0)
+        return 1;
 
-    config_print(&cfg);
+    vytvor_server(&cfg, fd);
 
-    int pocet = cfg.sirka * cfg.vyska;
+    close(listen_fd);
+    return 0;
+}
+
+
+
+
+
+ static int vytvor_server(const server_config *cfg, int prijaty) {
+    srand((unsigned)time(NULL));
+
+    config_print(cfg);
+
+    int pocet = cfg->sirka * cfg->vyska;
     policko_data matica[pocet];
-    sim_vypocitaj_maticu(&cfg, matica);
-
-    const char *port = "66666";
-    int pripajanie = siet_pocuvaj_tcp(port, 8);
-
-    if (pripajanie < 0) {
-        fprintf(stderr, "chyba");
-        return 3;
-    }
-
+    sim_vypocitaj_maticu(cfg, matica);
 
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = ukoncenie;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
-    if (sigaction(SIGINT, &sa, NULL) < 0) {
-        perror("sigaction");
-        close(pripajanie);
-        return 4;
-    }
+    sigaction(SIGINT, &sa, NULL);
 
-    
+    zdielaneData data;
+    pthread_mutex_init(&data.send_lock, NULL);
+    pthread_mutex_init(&data.lock, NULL);
 
-    printf("Cakam na pripojenie klienta na porte : %s\n", port);
-    fflush(stdout);
+    data.fd = prijaty;
+    data.running = 1;
+    data.mode = 0;
+    data.kroky = 0;
+    data.x = 0;
+    data.y = 0;
+    data.cfg = cfg;
+    data.matica = matica;
 
-        while (server_running) {
-        fd_set rfds;
-        FD_ZERO(&rfds);
-        FD_SET(pripajanie, &rfds);
+    pthread_t spracovanieSpravSKlientom;
+    pthread_t krokySimulacie;
 
-        int r = pselect(pripajanie + 1, &rfds, NULL, NULL, NULL, NULL);
-        if (r < 0) {
-            if (errno == EINTR)
-                continue;
-            perror("pselect");
-            break;
-        }
+    pthread_create(&spracovanieSpravSKlientom, NULL, cmd_thread, &data);
+    pthread_create(&krokySimulacie, NULL, sim_thread, &data);
 
-        int prijaty = siet_prijmi_klienta(pripajanie);
-        if (prijaty < 0) {
-            continue;
-        }
+    pthread_join(krokySimulacie, NULL);
 
-        printf("Uspesne som pripojil klienta\n");
+    close(prijaty);
 
-        zdielaneData data;
-        pthread_mutex_init(&data.send_lock, NULL);
-        pthread_mutex_init(&data.lock, NULL);
-        data.fd = prijaty;
-        data.running = 1;
-        data.mode = 0;
-        data.kroky = 0;
-        data.x = 0;
-        data.y = 0;
-        data.cfg = &cfg;
-        data.matica = matica;
+    pthread_join(spracovanieSpravSKlientom, NULL);
 
-        pthread_t spracovanieSpravSKlientom;
-        pthread_t krokySimulacie;
+    pthread_mutex_destroy(&data.send_lock);
+    pthread_mutex_destroy(&data.lock);
 
-        pthread_create(&spracovanieSpravSKlientom, NULL, cmd_thread, &data);
-            pthread_create(&krokySimulacie, NULL, sim_thread, &data);
-
-
-            pthread_join(krokySimulacie, NULL);
-
-
-            close(prijaty);
-
-
-            pthread_join(spracovanieSpravSKlientom, NULL);
-
-
-            pthread_mutex_destroy(&data.send_lock);
-            pthread_mutex_destroy(&data.lock);
-
-        
-    }
-
-
-    close(pripajanie);
     printf("server: Server ukonceny\n");
     return 0;
-
 }
+

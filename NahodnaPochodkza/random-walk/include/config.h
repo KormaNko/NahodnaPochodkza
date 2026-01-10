@@ -13,7 +13,7 @@ typedef struct {
 
 
 int config_parse(server_config *cfg, int argc, char **argv);
-
+int config_parse_string(server_config *cfg, const char *str);
 void NacitajConfig(char *out, size_t out_size);
 
 void config_print(const server_config *cfg);

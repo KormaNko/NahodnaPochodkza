@@ -8,41 +8,8 @@
 
 #include <string.h>
 
-int config_parse(server_config *cfg, int argc, char **argv) {
-    
-    if (argc != 10) {
-        fprintf(stderr, "Pouzitie: %s <suborVystup> <W> <H> <K> <pU> <pD> <pL> <pR>\n", argv[0]);
-        return 1;
-    }
 
-    cfg->suborVystup = argv[1];
-    cfg->sirka = atoi(argv[2]);
-    cfg->vyska = atoi(argv[3]);
-    cfg->K = atoi(argv[4]);
-    cfg->R = atoi(argv[5]);
-    cfg->pU = strtod(argv[6], NULL);
-    cfg->pD = strtod(argv[7], NULL);
-    cfg->pL = strtod(argv[8], NULL);
-    cfg->pR = strtod(argv[9], NULL);
 
-    if (cfg->sirka <= 0 || cfg->vyska <= 0 || cfg->K <= 0) {
-        fprintf(stderr, "Chyba: W, H, K musia byt kladne cele cisla.\n");
-        return 2;
-    }
-
-    if (cfg->pU < 0 || cfg->pD < 0 || cfg->pL < 0 || cfg->pR < 0) {
-        fprintf(stderr, "Chyba: pravdepodobnosti musia byt >= 0.\n");
-        return 3;
-    }
-
-    double sum = cfg->pU + cfg->pD + cfg->pL + cfg->pR;
-    if (fabs(sum - 1.0) > 1e-9) {
-        fprintf(stderr, "Chyba: pU+pD+pL+pR musi byt 1.0 (teraz je %.17g).\n", sum);
-        return 4;
-    }
-
-    return 0;
-}
 
 void config_print(const server_config *cfg) {
     printf("CONFIG suborVystup=%s W=%d H=%d K=%d pU=%.6f pD=%.6f pL=%.6f pR=%.6f\n",
@@ -83,10 +50,7 @@ void NacitajConfig(char *out, size_t out_size) {
     printf("Zadaj pR: ");
     fgets(pR, sizeof(pR), stdin);
 
-    if((pU + pD + pL + pR) != 1) {
-        return 1;
-        printf("Pravdepodobnosti musia byt spolu 1");
-    }
+    
     /* odstránenie '\n' */
     subor[strcspn(subor, "\n")] = 0;
     W[strcspn(W, "\n")] = 0;
@@ -102,4 +66,47 @@ void NacitajConfig(char *out, size_t out_size) {
     snprintf(out, out_size,
              "%s %s %s %s %s %s %s %s %s",
              subor, W, H, K, R, pU, pD, pL, pR);
+}
+
+int config_parse_string(server_config *cfg, const char *str) {
+    char subor[256];
+
+    int n = sscanf(
+        str,
+        "%255s %d %d %d %d %lf %lf %lf %lf",
+        subor,
+        &cfg->sirka,
+        &cfg->vyska,
+        &cfg->K,
+        &cfg->R,
+        &cfg->pU,
+        &cfg->pD,
+        &cfg->pL,
+        &cfg->pR
+    );
+
+    if (n != 9) {
+        fprintf(stderr, "Chyba: zly format CONFIG spravy.\n");
+        return 1;
+    }
+
+    cfg->suborVystup = strdup(subor);   // jediná alokácia, OK
+
+    if (cfg->sirka <= 0 || cfg->vyska <= 0 || cfg->K <= 0) {
+        fprintf(stderr, "Chyba: W, H, K musia byt kladne cele cisla.\n");
+        return 2;
+    }
+
+    if (cfg->pU < 0 || cfg->pD < 0 || cfg->pL < 0 || cfg->pR < 0) {
+        fprintf(stderr, "Chyba: pravdepodobnosti musia byt >= 0.\n");
+        return 3;
+    }
+
+    double sum = cfg->pU + cfg->pD + cfg->pL + cfg->pR;
+    if (fabs(sum - 1.0) > 1e-9) {
+        fprintf(stderr, "Chyba: pU+pD+pL+pR musi byt 1.0 (teraz je %.17g).\n", sum);
+        return 4;
+    }
+
+    return 0;
 }

@@ -39,6 +39,22 @@ void * prijmac_sprav_od_servera(void * arg) {
 int main(void) {
    
 
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        return 1;
+    }
+
+    if (pid == 0) {
+
+        execl("./bin/server", "./bin/server", NULL);
+        perror("exec");
+        exit(1);
+    }
+
+
+    sleep(1); 
+
     const char * host = "127.0.0.1";
     const char * port = "66666";
     int pripojenie = siet_pripoj_sa_tcp(host,port);
