@@ -128,6 +128,7 @@ if (pripojenie < 0) {
         printf("1) MODE INTERACTIVE\n");
         printf("2) MODE SUMMARY\n");
         printf("3) GET STATE\n");
+        printf("4) STOP\n");
         printf("0) QUIT\n");
         fflush(stdout);
 
@@ -150,6 +151,9 @@ if (pripojenie < 0) {
             break;
         case 3:
             spravaMenu= "GET STATE\n";
+            break;
+        case 4:
+            spravaMenu= "STOP\n";
             break;
         default:
             printf("Takyto prikaz nepoznam\n");

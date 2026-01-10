@@ -8,6 +8,10 @@ if(strcmp(riadok,"HELLO\n") == 0) {
         return PROTO_CMD_HELLO;
         }else if(strcmp(riadok,"QUIT\n") == 0) {
             return PROTO_CMD_QUIT;
+
+            }else if(strcmp(riadok,"STOP\n") == 0) {
+            return PROTO_CMD_STOP;
+
         }else if(strcmp(riadok,"MODE INTERACTIVE\n") == 0)
          {
             return PROTO_CMD_MODE_INTERACTIVE;
@@ -30,7 +34,10 @@ const char * protocol_cmd_name(spravy cmd) {
         break;
     case PROTO_CMD_QUIT:
         return "QUIT\n";
-        break;    
+        break;   
+    case PROTO_CMD_STOP:
+        return "STOP\n";
+        break;  
     case PROTO_CMD_MODE_INTERACTIVE:
         return "MODE INTERACTIVE\n";
         break;
