@@ -81,8 +81,8 @@ void *cmd_thread(void *arg) {
             pthread_mutex_lock(&data->lock);
             int run = data->running;
             pthread_mutex_unlock(&data->lock);
-
-            if (!run || !server_running)
+            //|| !server_running
+            if (!run )
                 break;
 
            
@@ -139,6 +139,7 @@ void *cmd_thread(void *arg) {
                 pthread_mutex_lock(&data->lock);
                 data->mode = 0;
                 pthread_mutex_unlock(&data->lock);
+                sim_vypocitaj_maticu(data->cfg, data->matica);
                 send_line(data, "Chces zobrazit (0) PRAVDEPODOBNOST alebo (1) PRIEMERNY POCET KROKOV?\n");
                 char odpoved[16];
                 int pocet = siet_precitaj_riadok(data->fd, odpoved, sizeof(odpoved));
@@ -202,7 +203,7 @@ static void *sim_thread(void *arg) {
                 data->running = 0;
                 data->mode = 0;
                 pthread_mutex_unlock(&data->lock);
-                server_running = 0;
+                //server_running = 0;
         }
 
         struct timespec ts;
@@ -248,8 +249,8 @@ int main(void) {
 
     int pocet = cfg->sirka * cfg->vyska;
     policko_data matica[pocet];
-    sim_vypocitaj_maticu(cfg, matica);
 
+    
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = ukoncenie;

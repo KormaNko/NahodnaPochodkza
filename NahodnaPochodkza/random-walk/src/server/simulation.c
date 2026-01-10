@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#define MAX_POCET_KROKOV 100000 // aby som tam nahodou neostal stucknuty vecne
+#define MAX_POCET_KROKOV 100000 
 
 
 
