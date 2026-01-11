@@ -123,7 +123,7 @@ int config_parse_string(server_config *cfg, const char *str) { // maly refactor 
     return 0;
 }
 
-int config_save_to_file(const server_config *cfg) { // maly refactor od ai mal som to napisane nepekne ale funkcionalita je rovnaka
+int config_save_to_file(const server_config *cfg) { 
     FILE *f = fopen(cfg->suborVystup, "w");
     if (!f) {
         perror("fopen suborVystup");
@@ -146,3 +146,4 @@ int config_save_to_file(const server_config *cfg) { // maly refactor od ai mal s
     fclose(f);
     return 0;
 }
+

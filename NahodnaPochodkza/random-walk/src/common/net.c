@@ -1,7 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "net.h"
-
 #include <errno.h>
 #include <netdb.h>
 #include <stdio.h>
@@ -9,6 +8,9 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+//tato trieda bola jednoznacne najviac s AI kedze som to nemal sancu inak sa naucit a vediet 95% toho kodu som aj tak pisal ja ale kazdu druhu vec som
+//nevedel cize som sa hrozne vela pytal
+// neviem ci sa to dalo spravit moc inac ako to mam teraz ja
 
 static int znovuPouzitie(int identifikator) {
     int pravda = 1;
@@ -139,3 +141,4 @@ int siet_prijmi_klienta(int listen_fd) {
     if(info < 0) perror("accept");
     return info;
 }
+
