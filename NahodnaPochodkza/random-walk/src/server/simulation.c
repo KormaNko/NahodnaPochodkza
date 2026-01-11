@@ -1,19 +1,12 @@
 #define _POSIX_C_SOURCE 200809L
-
 #include "simulation.h"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
-
 #define MAX_POCET_KROKOV 100000
 
-/* ============================================================
-   JEDEN KROK NÁHODNEJ POCHÔDZKY (s podporou prekážok)
-   ============================================================ */
-void sim_step(const simulation_context *ctx, int *x, int *y) {
+void sim_step(const simulation_context *ctx, int *x, int *y) { //tu som bral inspiraciu od AI 
     const server_config *cfg = ctx->cfg;
 
     int old_x = *x;
@@ -26,11 +19,9 @@ void sim_step(const simulation_context *ctx, int *x, int *y) {
     else if (r < cfg->pU + cfg->pD + cfg->pL) (*x)--;
     else (*x)++;
 
-    /* wrap-around svet */
     *x = (*x % cfg->sirka + cfg->sirka) % cfg->sirka;
     *y = (*y % cfg->vyska + cfg->vyska) % cfg->vyska;
 
-    /* prekážky */
     if (cfg->prekazky && ctx->prekazky) {
         int idx = (*y) * cfg->sirka + (*x);
         if (ctx->prekazky[idx]) {
@@ -40,9 +31,6 @@ void sim_step(const simulation_context *ctx, int *x, int *y) {
     }
 }
 
-/* ============================================================
-   DOSIAHNUTIE STREDU DO K KROKOV
-   ============================================================ */
 int sim_dojst_do_stredu_za_K(
     const simulation_context *ctx,
     int sx, int sy, int K
@@ -60,9 +48,6 @@ int sim_dojst_do_stredu_za_K(
     return 0;
 }
 
-/* ============================================================
-   POČET KROKOV K STREDU
-   ============================================================ */
 unsigned long sim_kolko_krokov_kym_trafim(
     const simulation_context *ctx,
     int sx, int sy,
@@ -81,9 +66,6 @@ unsigned long sim_kolko_krokov_kym_trafim(
     return max_steps;
 }
 
-/* ============================================================
-   SIMULÁCIA JEDNÉHO POLÍČKA
-   ============================================================ */
 sim_jedno_policko sim_simuluj_policko(
     const simulation_context *ctx,
     int sx, int sy,
@@ -104,10 +86,7 @@ sim_jedno_policko sim_simuluj_policko(
     return res;
 }
 
-/* ============================================================
-   VÝPOČET CELEJ MATICE
-   ============================================================ */
-void sim_vypocitaj_maticu(
+void sim_vypocitaj_maticu( 
     const simulation_context *ctx,
     policko_data *vystup_matica
 ) {
@@ -126,10 +105,7 @@ void sim_vypocitaj_maticu(
     }
 }
 
-/* ============================================================
-   MATICA → STRING (SUMMARY MODE)
-   ============================================================ */
-char *sim_matica_string(
+char *sim_matica_string( // tu mi to tiez AI trocha debugovalo a upravilo do krajsej formy
     const server_config *cfg,
     const policko_data *matica,
     int type
@@ -159,15 +135,7 @@ char *sim_matica_string(
     return out;
 }
 
-/* ============================================================
-   INTERACTIVE MODE
-   ============================================================ */
-void sim_interactive(
-    const simulation_context *ctx,
-    void (*writer)(const char *, void *),
-    simulation_should_stop_cb should_stop,
-    void *userdata
-) {
+void sim_interactive(const simulation_context *ctx,void (*writer)(const char *, void *),simulation_should_stop_cb should_stop,void *userdata) {// tu bola tiez uprava mojho povodne kodu
     const server_config *cfg = ctx->cfg;
     const unsigned tick_ms = 200;
 

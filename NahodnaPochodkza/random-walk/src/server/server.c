@@ -9,15 +9,10 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <sys/select.h>
-
 #include "net.h"
 #include "config.h"
 #include "protokol.h"
 #include "simulation.h"
-
-/* ========================================================= */
-/* ====================== DÁTA SERVERA ===================== */
-/* ========================================================= */
 
 typedef struct {
     int fd;
@@ -35,18 +30,9 @@ typedef struct {
 
     simulation_context sim_ctx;
 
-    int maxRozmer;
+    size_t maxRozmer;
 } zdielaneData;
 
-/* ========================================================= */
-/* ======================= SIGNAL ========================== */
-/* ========================================================= */
-
-
-
-/* ========================================================= */
-/* ======================= HELPERY ========================= */
-/* ========================================================= */
 
 static int simulation_should_stop(void *userdata) {
     zdielaneData *data = userdata;
@@ -72,12 +58,8 @@ static void simulation_update_writer(const char *line, void *userdata) {
         send_line(data, line);
 }
 
-/* ========================================================= */
-/* ===================== PREKÁŽKY ========================== */
-/* ========================================================= */
-
 static void generuj_prekazky(int *mapa, int sirka, int vyska) {
-    int pocet = (sirka * vyska) / 10; /* ~10 % */
+    int pocet = (sirka * vyska) / 10; 
 
     memset(mapa, 0, sizeof(int) * sirka * vyska);
 
@@ -97,14 +79,14 @@ static void generuj_prekazky(int *mapa, int sirka, int vyska) {
     }
 }
 
-/* ========================================================= */
-/* ===================== VLÁKNA ============================ */
-/* ========================================================= */
-
 static void *matrix_thread(void *arg) {
     
     zdielaneData *data = arg;
-    if(data->maxRozmer <= 900){
+    pthread_mutex_lock(&data->lock);
+    int max = data->maxRozmer;
+    pthread_mutex_unlock(&data->lock);
+
+    if(max <= 900){
     sim_vypocitaj_maticu(&data->sim_ctx, data->matica);
 
     pthread_mutex_lock(&data->lock);
@@ -164,8 +146,10 @@ static void *cmd_thread(void *arg) {
         FD_SET(data->fd, &rfds);
 
         int r = select(data->fd + 1, &rfds, NULL, NULL, &tv);
-        if (r <= 0)
-            continue;
+        if (r < 0) {
+            if (errno == EINTR) continue;
+            break;
+        }
 
         int info = siet_precitaj_riadok(data->fd, riadok, sizeof(riadok));
         if (info <= 0)
@@ -177,19 +161,28 @@ static void *cmd_thread(void *arg) {
             break;
 
         case PROTO_CMD_GET_STATE:
-            odpoved = (data->mode == 1)
+            pthread_mutex_lock(&data->lock);
+            int mode = data->mode;
+            pthread_mutex_unlock(&data->lock);
+
+            odpoved = (mode == 1)
                 ? "MODE INTERACTIVE\n"
                 : "MODE SUMMARY\n";
             break;
 
         case PROTO_CMD_MODE_INTERACTIVE:
+            pthread_mutex_lock(&data->lock);
             data->mode = 1;
+            pthread_mutex_unlock(&data->lock);
             odpoved = "OK MODE INTERACTIVE\n";
             break;
 
         case PROTO_CMD_MODE_SUMMARY:
+            pthread_mutex_lock(&data->lock);
             data->mode = 0;
-            if (!data->matica_ready)
+            int ready = data->matica_ready;
+            pthread_mutex_unlock(&data->lock);
+            if (!ready)
                 odpoved = "SUMMARY: MATICA SA ESTE POCITA\n";
             else if (data->maxRozmer > 900)
                 odpoved = "SUMMARY: MATICA PRILIS VELKA\n";
@@ -208,13 +201,17 @@ static void *cmd_thread(void *arg) {
             break;
 
         case PROTO_CMD_STOP:
+            pthread_mutex_lock(&data->lock);
             data->stop_requested = 1;
             data->running = 0;
+            pthread_mutex_unlock(&data->lock);
             odpoved = "SERVER ZASTAVENY\n";
             break;
 
         case PROTO_CMD_QUIT:
+            pthread_mutex_lock(&data->lock);
             data->running = 0;
+            pthread_mutex_unlock(&data->lock);
             odpoved = "ODPOJENY\n";
             break;
 
@@ -227,18 +224,21 @@ static void *cmd_thread(void *arg) {
     return NULL;
 }
 
-/* ========================================================= */
-/* ==================== SERVER CORE ======================== */
-/* ========================================================= */
-
 static int vytvor_server(const server_config *cfg, int fd) {
     srand(time(NULL));
     config_print(cfg);
 
-    int pocet = cfg->sirka * cfg->vyska;
+    size_t pocet = cfg->sirka * cfg->vyska;
 
     policko_data *matica = malloc(sizeof(policko_data) * pocet);
     int *prekazky = calloc(pocet, sizeof(int));
+    if (!matica || !prekazky) {
+    perror("malloc/calloc");
+    close(fd);
+    free(matica);
+    free(prekazky);
+    return 1;
+    }
 
     if (cfg->prekazky){
         generuj_prekazky(prekazky, cfg->sirka, cfg->vyska);
@@ -290,10 +290,6 @@ static int vytvor_server(const server_config *cfg, int fd) {
 
     return 0;
 }
-
-/* ========================================================= */
-/* ======================== MAIN =========================== */
-/* ========================================================= */
 
 int main(void) {
     int listen_fd = siet_pocuvaj_tcp("64321", 1);
