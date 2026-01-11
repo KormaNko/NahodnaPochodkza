@@ -6,7 +6,7 @@
 #include <time.h>
 #define MAX_POCET_KROKOV 100000
 
-void sim_step(const simulation_context *ctx, int *x, int *y) { //tu som bral inspiraciu od AI 
+void sim_step(const simulation_context *ctx, int *x, int *y) { //tu som bral dost velku inspiraciu od AI 
     const server_config *cfg = ctx->cfg;
 
     int old_x = *x;
@@ -135,7 +135,7 @@ char *sim_matica_string( // tu mi to tiez AI trocha debugovalo a upravilo do kra
     return out;
 }
 
-void sim_interactive(const simulation_context *ctx,void (*writer)(const char *, void *),simulation_should_stop_cb should_stop,void *userdata) {// tu bola tiez uprava mojho povodne kodu
+void sim_interactive(const simulation_context *ctx,void (*writer)(const char *, void *),simulation_should_stop_cb should_stop,void *userdata) {// tato metoda bola dost slusne miero robena s ai hlavne call backy a podobne 
     const server_config *cfg = ctx->cfg;
     const unsigned tick_ms = 200;
 

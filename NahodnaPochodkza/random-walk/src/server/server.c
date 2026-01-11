@@ -99,8 +99,8 @@ static void *sim_thread(void *arg) {// tu mi to debugovalo ai
         if (!run)
             break;
         if (mode == 1) {
-            sim_interactive(
-                &data->sim_ctx,
+            sim_interactive(      // tu sialenost  s tym call backom tiez riesila ai mal som predtym globalnu premennu cize som to musel zmenit cize tento call back aj co bol vyssie 
+                &data->sim_ctx,     // mi poradil povedal ze je to ucebnicovy priklad a ze to je to co sa odomna caka :D fuu bola to celkom vyzva
                 simulation_update_writer,
                 simulation_should_stop,
                 data
@@ -127,7 +127,7 @@ static void *cmd_thread(void *arg) {
         pthread_mutex_unlock(&data->lock);
         if (!run)
             break;
-        fd_set rfds;            // tieto riadky tiez robilo AI
+        fd_set rfds;            // tieto riadky tiez robilo zase AI naozaj dufam ze je to kvalitne a technicke riesenie  :D 
         struct timeval tv = {0, 200000};
         FD_ZERO(&rfds);
         FD_SET(data->fd, &rfds);
@@ -215,7 +215,7 @@ static int vytvor_server(const server_config *cfg, int fd) {
     return 1;
     }
     if (cfg->prekazky){
-        generuj_prekazky(prekazky, cfg->sirka, cfg->vyska);
+        generuj_prekazky(prekazky, cfg->sirka, cfg->vyska); // tento obrazok som doslova skopcil od AI
         printf("MAPA PREKAZOK:\n");
         for (int y = 0; y < cfg->vyska; y++) {
             for (int x = 0; x < cfg->sirka; x++) {

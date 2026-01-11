@@ -34,7 +34,7 @@ void * prijmac_sprav_od_servera(void * arg) {
        int r = select(sp->fd + 1, &rfds, NULL, NULL, NULL);
     if (r <= 0)
     continue;
-            // po tialto 
+            // po tialto povedalo ze je to bezna prax robit to takto 
         int info = siet_precitaj_riadok(sp->fd,riadok,sizeof(riadok));
         if(info > 0){
             printf("%s", riadok);
@@ -59,7 +59,7 @@ int main(void) {
         perror("fork");
         return 1;
     }
-    if (pid == 0) {
+    if (pid == 0) { // toto som si tiez pozerl cez AI lebo som si uz nepametal ako nato
         execl("./bin/server", "./bin/server", NULL);
         perror("exec");
         exit(1);
@@ -119,11 +119,12 @@ if (pripojenie < 0) {
             break;
         }
         char *end;
-        long volba = strtol(sprava, &end, 10);
+        long volba = strtol(sprava, &end, 10); // toto robilo AI tu ochranu pred zlym nacitanim
         if (end == sprava || *end != '\n') {
             printf("Zly vstup\n");
             continue;
         }
+
         int cisloVmenu = (int)volba;
         const char * spravaMenu = NULL;
 
@@ -159,8 +160,7 @@ if (pripojenie < 0) {
   pthread_mutex_lock(&sp.lock);
 sp.running = 0;
 pthread_mutex_unlock(&sp.lock);
-
-shutdown(sp.fd, SHUT_RDWR);
+shutdown(sp.fd, SHUT_RDWR); // toto shutdown mi tiez AI poradilo povedalo ze je to 100% legitimne tak dufam :)
 pthread_join(komunikaciaServer, NULL);
 close(sp.fd);
 pthread_mutex_destroy(&sp.lock);
