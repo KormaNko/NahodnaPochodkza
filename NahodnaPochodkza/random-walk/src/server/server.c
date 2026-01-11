@@ -268,7 +268,6 @@ int main(void) {
     server_config cfg;
     if (config_parse_string(&cfg, line + 7) != 0)
         return 1;
-    config_save_to_file(&cfg);
     vytvor_server(&cfg, fd);
     free((void *)cfg.suborVystup);
     return 0;

@@ -82,6 +82,10 @@ if (pripojenie < 0) {
 }
     char config_line[256];
     NacitajConfig(config_line, sizeof(config_line));
+    server_config cfg;
+    config_parse_string(&cfg, config_line);
+    config_save_to_file(&cfg);
+    free((void *)cfg.suborVystup);
     char msg[300];
     snprintf(msg, sizeof(msg), "CONFIG %s\n", config_line);
     siet_posli_vsetko(pripojenie, msg, strlen(msg));
