@@ -12,8 +12,11 @@
 
 
 void config_print(const server_config *cfg) {
-    printf("CONFIG suborVystup=%s W=%d H=%d K=%d pU=%.6f pD=%.6f pL=%.6f pR=%.6f\n",
-           cfg->suborVystup, cfg->sirka, cfg->vyska, cfg->K, cfg->pU, cfg->pD, cfg->pL, cfg->pR);
+    printf(
+ "CONFIG suborVystup=%s W=%d H=%d K=%d R=%d pU=%.6f pD=%.6f pL=%.6f pR=%.6f prekazky=%d\n",
+ cfg->suborVystup, cfg->sirka, cfg->vyska, cfg->K, cfg->R,
+ cfg->pU, cfg->pD, cfg->pL, cfg->pR, cfg->prekazky
+);
     fflush(stdout);
 }
 
@@ -21,7 +24,7 @@ void config_print(const server_config *cfg) {
 void NacitajConfig(char *out, size_t out_size) {
     char subor[128];
     char W[16], H[16], K[16], R[16];
-    char pU[16], pD[16], pL[16], pR[16];
+    char pU[16], pD[16], pL[16], pR[16], pRe[16];
 
     printf("Zadaj vstupny subor sveta: ");
     fgets(subor, sizeof(subor), stdin);
@@ -50,6 +53,8 @@ void NacitajConfig(char *out, size_t out_size) {
     printf("Zadaj pR: ");
     fgets(pR, sizeof(pR), stdin);
 
+    printf("Chces prekazky ?: ");
+    fgets(pRe, sizeof(pRe), stdin);
     
     /* odstránenie '\n' */
     subor[strcspn(subor, "\n")] = 0;
@@ -61,11 +66,11 @@ void NacitajConfig(char *out, size_t out_size) {
     pD[strcspn(pD, "\n")] = 0;
     pL[strcspn(pL, "\n")] = 0;
     pR[strcspn(pR, "\n")] = 0;
-
-    /* výsledný string – rovnaký formát, aký čaká config_parse */
+    pRe[strcspn(pRe, "\n")] = 0;
+    
     snprintf(out, out_size,
-             "%s %s %s %s %s %s %s %s %s",
-             subor, W, H, K, R, pU, pD, pL, pR);
+             "%s %s %s %s %s %s %s %s %s %s",
+             subor, W, H, K, R, pU, pD, pL, pR,pRe);
 }
 
 int config_parse_string(server_config *cfg, const char *str) {
@@ -73,7 +78,7 @@ int config_parse_string(server_config *cfg, const char *str) {
 
     int n = sscanf(
         str,
-        "%255s %d %d %d %d %lf %lf %lf %lf",
+        "%255s %d %d %d %d %lf %lf %lf %lf %d",
         subor,
         &cfg->sirka,
         &cfg->vyska,
@@ -82,15 +87,27 @@ int config_parse_string(server_config *cfg, const char *str) {
         &cfg->pU,
         &cfg->pD,
         &cfg->pL,
-        &cfg->pR
+        &cfg->pR,
+        &cfg->prekazky
     );
 
-    if (n != 9) {
+    if (n != 10) {
         fprintf(stderr, "Chyba: zly format CONFIG spravy.\n");
         return 1;
     }
 
-    cfg->suborVystup = strdup(subor);   // jediná alokácia, OK
+   
+
+    cfg->suborVystup = strdup(subor);
+if (!cfg->suborVystup) {
+    perror("strdup");
+    return 6;
+}
+
+if (cfg->prekazky != 0 && cfg->prekazky != 1) {
+    free((void *)cfg->suborVystup);
+    return 5;
+}
 
     if (cfg->sirka <= 0 || cfg->vyska <= 0 || cfg->K <= 0) {
         fprintf(stderr, "Chyba: W, H, K musia byt kladne cele cisla.\n");
@@ -102,6 +119,8 @@ int config_parse_string(server_config *cfg, const char *str) {
         return 3;
     }
 
+    
+    
     double sum = cfg->pU + cfg->pD + cfg->pL + cfg->pR;
     if (fabs(sum - 1.0) > 1e-9) {
         fprintf(stderr, "Chyba: pU+pD+pL+pR musi byt 1.0 (teraz je %.17g).\n", sum);
@@ -119,16 +138,17 @@ int config_save_to_file(const server_config *cfg) {
     }
 
     fprintf(f,
-        "%d %d %d %d %.6f %.6f %.6f %.6f\n",
-        cfg->sirka,
-        cfg->vyska,
-        cfg->K,
-        cfg->R,
-        cfg->pU,
-        cfg->pD,
-        cfg->pL,
-        cfg->pR
-    );
+    "%d %d %d %d %.6f %.6f %.6f %.6f %d\n",
+    cfg->sirka,
+    cfg->vyska,
+    cfg->K,
+    cfg->R,
+    cfg->pU,
+    cfg->pD,
+    cfg->pL,
+    cfg->pR,
+    cfg->prekazky
+);
 
     fclose(f);
     return 0;

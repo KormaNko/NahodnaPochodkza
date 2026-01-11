@@ -9,6 +9,7 @@ typedef struct {
     int K;
     int R;
     double pU, pD, pL, pR;
+    int prekazky;
 } server_config;
 
 
