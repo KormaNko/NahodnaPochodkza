@@ -73,7 +73,7 @@ int main(void) {
         exit(1);
     }
     const char * host = "127.0.0.1";
-    const char * port = "54321";
+    const char * port = "64321";
 
     sleep(1); 
 
@@ -165,14 +165,7 @@ if (pripojenie < 0) {
             break;
         }
 
-        if(cisloVmenu == 2){
-            
-            char odpoved[16];
-            if(fgets(odpoved, sizeof(odpoved), stdin) == NULL)
-                break;
-           
-            siet_posli_vsetko(pripojenie, odpoved, strlen(odpoved));
-        }
+       
 
         if(strcmp(spravaMenu,"QUIT\n") == 0) {
             break;

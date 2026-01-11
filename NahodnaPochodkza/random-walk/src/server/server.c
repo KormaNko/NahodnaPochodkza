@@ -122,6 +122,7 @@ void *cmd_thread(void *arg) {
 
            
             int info = siet_precitaj_riadok(data->fd, riadok, sizeof(riadok));
+            
             if (info <= 0) {
                 pthread_mutex_lock(&data->lock);
                 data->running = 0;
@@ -247,12 +248,14 @@ nanosleep(&ts, NULL);
 
 
 int main(void) {
-    int listen_fd = siet_pocuvaj_tcp("54321", 1);
+    int listen_fd = siet_pocuvaj_tcp("64321", 1);
     int fd = siet_prijmi_klienta(listen_fd);
 
     char line[512];
     if (siet_precitaj_riadok(fd, line, sizeof(line)) <= 0)
         return 1;
+
+        
 
     if (strncmp(line, "CONFIG ", 7) != 0)
         return 1;
@@ -320,10 +323,10 @@ int main(void) {
 
     pthread_join(krokySimulacie, NULL);
 
-    close(prijaty);
+    
 
     pthread_join(spracovanieSpravSKlientom, NULL);
-
+    close(prijaty);
     pthread_mutex_destroy(&data.send_lock);
     pthread_mutex_destroy(&data.lock);
 
