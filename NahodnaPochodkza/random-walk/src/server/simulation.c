@@ -142,6 +142,7 @@ char *sim_matica_string(const server_config *cfg, const policko_data *matica, in
     }
     return vystup;
 }
+
 void sim_interactive(
     const server_config *cfg,
     void (*writer)(const char *, void *),

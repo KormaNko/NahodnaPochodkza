@@ -73,7 +73,7 @@ int main(void) {
         exit(1);
     }
     const char * host = "127.0.0.1";
-    const char * port = "77777";
+    const char * port = "12345";
 
     sleep(1); 
 

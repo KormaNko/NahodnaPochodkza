@@ -241,7 +241,7 @@ nanosleep(&ts, NULL);
 
 
 int main(void) {
-    int listen_fd = siet_pocuvaj_tcp("77777", 1);
+    int listen_fd = siet_pocuvaj_tcp("12345", 1);
     int fd = siet_prijmi_klienta(listen_fd);
 
     char line[512];
@@ -257,7 +257,7 @@ int main(void) {
 
     vytvor_server(&cfg, fd);
     free((void *)cfg.suborVystup);
-    close(listen_fd);
+    //close(listen_fd);
     return 0;
 }
 
