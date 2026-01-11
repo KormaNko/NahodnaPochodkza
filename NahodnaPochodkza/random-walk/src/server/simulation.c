@@ -29,12 +29,7 @@ void sim_step(const server_config *cfg, int *x, int *y) {
     *y = (*y % cfg->vyska + cfg->vyska) % cfg->vyska;
 }
 
-void* sim_policko_vlakno(void* arg) {
-    vlakno_args * data = (vlakno_args*) arg;
-    sim_jedno_policko vysledok = sim_simuluj_policko(data->config,data->policko->x,data->policko->y,data->config->K,data->maxKrokov);
-    data->policko->stats = vysledok;
-    return NULL;
-}
+
 
 int sim_dojst_do_stredu_za_K(const server_config *cfg, int sx, int sy, int K) {
    
@@ -94,8 +89,6 @@ unsigned long sim_kolko_krokov_kym_trafim(const server_config *cfg, int sx, int 
 
     void sim_vypocitaj_maticu(const server_config *cfg, policko_data *vystup_matica) {
     unsigned long long pocetPolicok = cfg->vyska * cfg->sirka;
-    pthread_t vlakna[pocetPolicok];
-    vlakno_args vlaknaData[pocetPolicok];
 
     for (unsigned long long i = 0; i < pocetPolicok; i++) {
         int x = i % cfg->sirka;
@@ -104,15 +97,8 @@ unsigned long sim_kolko_krokov_kym_trafim(const server_config *cfg, int sx, int 
         vystup_matica[i].x = x;
         vystup_matica[i].y = y;
 
-        vlaknaData[i].config   = cfg;
-        vlaknaData[i].maxKrokov = MAX_POCET_KROKOV;
-        vlaknaData[i].policko  = &vystup_matica[i];
-
-        pthread_create(&vlakna[i], NULL, sim_policko_vlakno, &vlaknaData[i]);
-    }
-
-    for (unsigned long long i = 0; i < pocetPolicok; i++) {
-        pthread_join(vlakna[i], NULL);
+        vystup_matica[i].stats =
+            sim_simuluj_policko(cfg, x, y, cfg->K, MAX_POCET_KROKOV);
     }
 }
 

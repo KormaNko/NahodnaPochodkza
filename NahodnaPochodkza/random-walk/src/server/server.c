@@ -29,6 +29,7 @@ typedef struct {
     int mode;
     int x, y;
     int stop_requested;
+    int matica_ready;
     unsigned long kroky;
     pthread_mutex_t lock;
     pthread_mutex_t send_lock;
@@ -70,6 +71,17 @@ static void simulation_update_writer(const char *line, void *userdata) {
     }
 }
 
+void *matrix_thread(void *arg) {
+    zdielaneData *data = arg;
+
+    sim_vypocitaj_maticu(data->cfg, data->matica);
+
+    pthread_mutex_lock(&data->lock);
+    data->matica_ready = 1;
+    pthread_mutex_unlock(&data->lock);
+
+    return NULL;
+}
 
 void *cmd_thread(void *arg) {
     zdielaneData *data = (zdielaneData*)arg;
@@ -97,9 +109,11 @@ void *cmd_thread(void *arg) {
 
             int r = select(data->fd + 1, &rfds, NULL, NULL, &tv);
             if (r < 0) {
-               
-                break;
-            }
+            if (errno == EINTR)
+                continue;
+            perror("select");
+            break;
+        }
             if (r == 0) {
                 
                 continue;
@@ -135,22 +149,31 @@ void *cmd_thread(void *arg) {
                 pthread_mutex_unlock(&data->lock);
                 break;
             case PROTO_CMD_MODE_SUMMARY:
-                spravaPreClienta = "OK MODE SUMMARY\n";
                 pthread_mutex_lock(&data->lock);
+                int ready = data->matica_ready;
                 data->mode = 0;
                 pthread_mutex_unlock(&data->lock);
-                sim_vypocitaj_maticu(data->cfg, data->matica);
-                send_line(data, "Chces zobrazit (0) PRAVDEPODOBNOST alebo (1) PRIEMERNY POCET KROKOV?\n");
-                char odpoved[16];
-                int pocet = siet_precitaj_riadok(data->fd, odpoved, sizeof(odpoved));
-                if (pocet > 0) {
-                    int volba = atoi(odpoved);
-                    char *vystup = sim_matica_string(data->cfg, data->matica, volba);
-                    send_line(data, vystup);
-                    free(vystup);
-                } else {
-                    send_line(data, "Chyba pri citani volby summary.\n");
+
+                if (!ready) {
+                    spravaPreClienta = "SUMMARY: MATICA SA ESTE POCITA\n";
+                    break;
                 }
+
+                spravaPreClienta = "OK MODE SUMMARY\n";
+                send_line(data, spravaPreClienta);
+
+                
+                send_line(data, "=== PRAVDEPODOBNOST ===\n");
+                char *p = sim_matica_string(data->cfg, data->matica, 0);
+                send_line(data, p);
+                free(p);
+
+               
+                send_line(data, "=== PRIEMERNY POCET KROKOV ===\n");
+                char *a = sim_matica_string(data->cfg, data->matica, 1);
+                send_line(data, a);
+                free(a);
+
                 break;
             case PROTO_CMD_QUIT:
                 pthread_mutex_lock(&data->lock);
@@ -203,7 +226,7 @@ static void *sim_thread(void *arg) {
                 data->running = 0;
                 data->mode = 0;
                 pthread_mutex_unlock(&data->lock);
-                //server_running = 0;
+                
         }
 
         struct timespec ts;
@@ -248,7 +271,12 @@ int main(void) {
     config_print(cfg);
 
     int pocet = cfg->sirka * cfg->vyska;
-    policko_data matica[pocet];
+
+        policko_data *matica = malloc(sizeof(policko_data) * pocet);
+        if (!matica) {
+            perror("malloc matica");
+            exit(1);
+        }
 
     
     struct sigaction sa;
@@ -271,10 +299,13 @@ int main(void) {
     data.cfg = cfg;
     data.matica = matica;
     data.stop_requested = 0;
+    data.matica_ready = 0;
+    pthread_t matrix_tid;
 
     pthread_t spracovanieSpravSKlientom;
     pthread_t krokySimulacie;
-
+    pthread_create(&matrix_tid, NULL, matrix_thread, &data);
+    
     pthread_create(&spracovanieSpravSKlientom, NULL, cmd_thread, &data);
     pthread_create(&krokySimulacie, NULL, sim_thread, &data);
 
@@ -288,6 +319,8 @@ int main(void) {
     pthread_mutex_destroy(&data.lock);
 
     printf("server: Server ukonceny\n");
+    pthread_join(matrix_tid, NULL);
+    free(matica);
     return 0;
 }
 
