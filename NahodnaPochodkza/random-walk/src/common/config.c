@@ -110,3 +110,26 @@ int config_parse_string(server_config *cfg, const char *str) {
 
     return 0;
 }
+
+int config_save_to_file(const server_config *cfg) {
+    FILE *f = fopen(cfg->suborVystup, "w");
+    if (!f) {
+        perror("fopen suborVystup");
+        return -1;
+    }
+
+    fprintf(f,
+        "%d %d %d %d %.6f %.6f %.6f %.6f\n",
+        cfg->sirka,
+        cfg->vyska,
+        cfg->K,
+        cfg->R,
+        cfg->pU,
+        cfg->pD,
+        cfg->pL,
+        cfg->pR
+    );
+
+    fclose(f);
+    return 0;
+}

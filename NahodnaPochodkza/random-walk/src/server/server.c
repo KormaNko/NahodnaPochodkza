@@ -35,6 +35,7 @@ typedef struct {
     pthread_mutex_t send_lock;
     const server_config *cfg;
     policko_data *matica;
+    int maxRozmer;
 } zdielaneData;
 
 
@@ -153,11 +154,16 @@ void *cmd_thread(void *arg) {
                 int ready = data->matica_ready;
                 data->mode = 0;
                 pthread_mutex_unlock(&data->lock);
+                if (data->maxRozmer > 900) {
+                    spravaPreClienta = "SUMMARY: MATICA JE TAK VELKA ZE JU NEZMESTIM NA OBRAZOVKU\n";
+                    break;
+                }
 
                 if (!ready) {
                     spravaPreClienta = "SUMMARY: MATICA SA ESTE POCITA\n";
                     break;
                 }
+
 
                 spravaPreClienta = "OK MODE SUMMARY\n";
                 send_line(data, spravaPreClienta);
@@ -252,12 +258,14 @@ int main(void) {
         return 1;
 
     server_config cfg;
-    if (config_parse_string(&cfg, line + 7) != 0)
-        return 1;
+    if (config_parse_string(&cfg, line + 7) != 0) {
+    return 1;
+}
 
+    config_save_to_file(&cfg);
     vytvor_server(&cfg, fd);
     free((void *)cfg.suborVystup);
-    //close(listen_fd);
+    
     return 0;
 }
 
@@ -300,6 +308,7 @@ int main(void) {
     data.matica = matica;
     data.stop_requested = 0;
     data.matica_ready = 0;
+    data.maxRozmer = pocet;
     pthread_t matrix_tid;
 
     pthread_t spracovanieSpravSKlientom;
