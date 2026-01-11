@@ -8,6 +8,7 @@
 #include "config.h"
 #include <errno.h> 
 #include <sys/select.h>
+
 typedef struct  {
     int fd;
     int running;
@@ -21,18 +22,19 @@ void * prijmac_sprav_od_servera(void * arg) {
         pthread_mutex_lock(&sp->lock);
         int run = sp->running;
         pthread_mutex_unlock(&sp->lock);
-
         if (!run)
             break;
 
-        fd_set rfds;
+        fd_set rfds; // zas a znovu tieto ridaky su cisto od AI - >
         FD_ZERO(&rfds);
-        FD_SET(sp->fd, &rfds);
-
+        pthread_mutex_lock(&sp->lock);
+        int fd = sp->fd;
+        pthread_mutex_unlock(&sp->lock);
+        FD_SET(fd, &rfds);
        int r = select(sp->fd + 1, &rfds, NULL, NULL, NULL);
     if (r <= 0)
     continue;
-
+            // po tialto 
         int info = siet_precitaj_riadok(sp->fd,riadok,sizeof(riadok));
         if(info > 0){
             printf("%s", riadok);
@@ -48,36 +50,23 @@ void * prijmac_sprav_od_servera(void * arg) {
             break;
         }
     }
-     
     return NULL;
 }
 
-
-
-
-
-
 int main(void) {
-   
-
     pid_t pid = fork();
     if (pid < 0) {
         perror("fork");
         return 1;
     }
-
     if (pid == 0) {
-
         execl("./bin/server", "./bin/server", NULL);
         perror("exec");
         exit(1);
     }
     const char * host = "127.0.0.1";
     const char * port = "64321";
-
     sleep(1); 
-
-    
     int pripojenie = -1;
 
 for (int i = 0; i < 50; i++) {         
@@ -91,29 +80,20 @@ if (pripojenie < 0) {
     fprintf(stderr, "Nepodarilo sa pripojit k serveru\n");
     return 1;
 }
-    
-
     char config_line[256];
     NacitajConfig(config_line, sizeof(config_line));
-
-
     char msg[300];
     snprintf(msg, sizeof(msg), "CONFIG %s\n", config_line);
     siet_posli_vsetko(pripojenie, msg, strlen(msg));
-
     pthread_t komunikaciaServer;
     spolocneData sp;
-    
     sp.fd = pripojenie;
     sp.running = 1;
     pthread_mutex_init(&sp.lock, NULL);
-    
     if(pthread_create(&komunikaciaServer,NULL,prijmac_sprav_od_servera,&sp) != 0) {
         close(pripojenie);
         return 5;
     }
-
-    // Handshake
     const char * handshake = "HELLO\n";
     int skusamPripojenie = siet_posli_vsetko(pripojenie,handshake,strlen(handshake));
     if(skusamPripojenie < 0) {
@@ -121,7 +101,6 @@ if (pripojenie < 0) {
         close(pripojenie);
         return 6;
     }
-
     char sprava[256];
     while(1) {
         printf("\nMenu: \n"); 
@@ -135,7 +114,13 @@ if (pripojenie < 0) {
         if(fgets(sprava, sizeof(sprava), stdin) == NULL) {
             break;
         }
-        int cisloVmenu = atoi(sprava);
+        char *end;
+        long volba = strtol(sprava, &end, 10);
+        if (end == sprava || *end != '\n') {
+            printf("Zly vstup\n");
+            continue;
+        }
+        int cisloVmenu = (int)volba;
         const char * spravaMenu = NULL;
 
         switch (cisloVmenu)
@@ -159,19 +144,14 @@ if (pripojenie < 0) {
             printf("Takyto prikaz nepoznam\n");
             continue;
         }
-
         int sent = siet_posli_vsetko(pripojenie,spravaMenu,strlen(spravaMenu));
         if (sent < 0) {
             break;
         }
-
-       
-
         if(strcmp(spravaMenu,"QUIT\n") == 0) {
             break;
         }
     }
-    
   pthread_mutex_lock(&sp.lock);
 sp.running = 0;
 pthread_mutex_unlock(&sp.lock);

@@ -1,17 +1,11 @@
 #define _POSIX_C_SOURCE 200809L
-
 #include "config.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-
 #include <string.h>
 
-
-
-
-void config_print(const server_config *cfg) {
+void config_print(const server_config *cfg) {  // maly refactor od ai mal som to napisane nepekne ale funkcionalita je rovnaka
     printf(
  "CONFIG suborVystup=%s W=%d H=%d K=%d R=%d pU=%.6f pD=%.6f pL=%.6f pR=%.6f prekazky=%d\n",
  cfg->suborVystup, cfg->sirka, cfg->vyska, cfg->K, cfg->R,
@@ -21,7 +15,7 @@ void config_print(const server_config *cfg) {
 }
 
 
-void NacitajConfig(char *out, size_t out_size) {
+void NacitajConfig(char *out, size_t out_size) { // maly refactor od ai mal som to napisane nepekne ale funkcionalita je rovnaka
     char subor[128];
     char W[16], H[16], K[16], R[16];
     char pU[16], pD[16], pL[16], pR[16], pRe[16];
@@ -56,7 +50,7 @@ void NacitajConfig(char *out, size_t out_size) {
     printf("Chces prekazky ?: ");
     fgets(pRe, sizeof(pRe), stdin);
     
-    /* odstránenie '\n' */
+ 
     subor[strcspn(subor, "\n")] = 0;
     W[strcspn(W, "\n")] = 0;
     H[strcspn(H, "\n")] = 0;
@@ -73,9 +67,8 @@ void NacitajConfig(char *out, size_t out_size) {
              subor, W, H, K, R, pU, pD, pL, pR,pRe);
 }
 
-int config_parse_string(server_config *cfg, const char *str) {
+int config_parse_string(server_config *cfg, const char *str) { // maly refactor od ai mal som to napisane nepekne ale funkcionalita je rovnaka
     char subor[256];
-
     int n = sscanf(
         str,
         "%255s %d %d %d %d %lf %lf %lf %lf %d",
@@ -98,26 +91,26 @@ int config_parse_string(server_config *cfg, const char *str) {
 
    
 
-    cfg->suborVystup = strdup(subor);
-if (!cfg->suborVystup) {
-    perror("strdup");
-    return 6;
-}
+            cfg->suborVystup = strdup(subor);
+        if (!cfg->suborVystup) {
+            perror("strdup");
+            return 6;
+        }
 
-if (cfg->prekazky != 0 && cfg->prekazky != 1) {
-    free((void *)cfg->suborVystup);
-    return 5;
-}
+        if (cfg->prekazky != 0 && cfg->prekazky != 1) {
+            free((void *)cfg->suborVystup);
+            return 5;
+        }
 
-    if (cfg->sirka <= 0 || cfg->vyska <= 0 || cfg->K <= 0) {
-        fprintf(stderr, "Chyba: W, H, K musia byt kladne cele cisla.\n");
-        return 2;
-    }
+        if (cfg->sirka <= 0 || cfg->vyska <= 0 || cfg->K <= 0) {
+            fprintf(stderr, "Chyba: W, H, K musia byt kladne cele cisla.\n");
+            return 2;
+        }
 
-    if (cfg->pU < 0 || cfg->pD < 0 || cfg->pL < 0 || cfg->pR < 0) {
-        fprintf(stderr, "Chyba: pravdepodobnosti musia byt >= 0.\n");
-        return 3;
-    }
+        if (cfg->pU < 0 || cfg->pD < 0 || cfg->pL < 0 || cfg->pR < 0) {
+            fprintf(stderr, "Chyba: pravdepodobnosti musia byt >= 0.\n");
+            return 3;
+        }
 
     
     
@@ -130,7 +123,7 @@ if (cfg->prekazky != 0 && cfg->prekazky != 1) {
     return 0;
 }
 
-int config_save_to_file(const server_config *cfg) {
+int config_save_to_file(const server_config *cfg) { // maly refactor od ai mal som to napisane nepekne ale funkcionalita je rovnaka
     FILE *f = fopen(cfg->suborVystup, "w");
     if (!f) {
         perror("fopen suborVystup");

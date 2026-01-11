@@ -1,9 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
-
-#include "string.h"
+#include <string.h>
 #include "protokol.h"
 spravy protocol_parse_line(const char *riadok){
-
 if(strcmp(riadok,"HELLO\n") == 0) {
         return PROTO_CMD_HELLO;
         }else if(strcmp(riadok,"QUIT\n") == 0) {
