@@ -3,55 +3,91 @@
 
 #include "config.h"
 
+/* ============================================================
+   ŠTRUKTÚRY DÁT
+   ============================================================ */
+
+/* Výsledok simulácie jedného políčka */
 typedef struct {
     double p_hit_within_K;
     double avg_steps_to_hit;
 } sim_jedno_policko;
 
+/* Dáta jedného políčka v matici */
 typedef struct {
-sim_jedno_policko stats;
-int x;
-int y;
-}policko_data;
+    sim_jedno_policko stats;
+    int x;
+    int y;
+} policko_data;
 
-typedef struct  {
-policko_data *policko;        
-const server_config *config;
-unsigned long long  maxKrokov;
-}vlakno_args;
+/* Kontext simulácie (žiadne globálne premenné) */
+typedef struct {
+    const server_config *cfg;
+    const int *prekazky;   /* NULL ak prekážky nie sú */
+} simulation_context;
 
-void sim_step(const server_config *cfg, int *x, int *y);
+/* ============================================================
+   KROK SIMULÁCIE
+   ============================================================ */
 
-sim_jedno_policko sim_simuluj_policko(const server_config *cfg, int sx, int sy, int K, unsigned long max_steps);
+void sim_step(
+    const simulation_context *ctx,
+    int *x,
+    int *y
+);
 
-int sim_dojst_do_stredu_za_K(const server_config *cfg, int sx, int sy, int K);
+/* ============================================================
+   VÝPOČTY PRAVDEPODOBNOSTÍ
+   ============================================================ */
 
-void* sim_policko_vlakno(void* arg);
+int sim_dojst_do_stredu_za_K(
+    const simulation_context *ctx,
+    int sx,
+    int sy,
+    int K
+);
 
-unsigned long sim_kolko_krokov_kym_trafim(const server_config *cfg, int sx, int sy, unsigned long max_steps);
+unsigned long sim_kolko_krokov_kym_trafim(
+    const simulation_context *ctx,
+    int sx,
+    int sy,
+    unsigned long max_steps
+);
+
+sim_jedno_policko sim_simuluj_policko(
+    const simulation_context *ctx,
+    int sx,
+    int sy,
+    int K,
+    unsigned long max_steps
+);
+
+/* ============================================================
+   MATICA
+   ============================================================ */
 
 void sim_vypocitaj_maticu(
-    const server_config *cfg,
-                        
-    policko_data *vystup_matica  
+    const simulation_context *ctx,
+    policko_data *vystup_matica
 );
 
-void sim_vypis_maticu(
+char *sim_matica_string(
     const server_config *cfg,
-    const policko_data *matica,int type
+    const policko_data *matica,
+    int type
 );
 
-char *sim_matica_string(const server_config *cfg, const policko_data *matica, int type);
-
-
-typedef void (*sim_update_cb)(const char *line, void *userdata);
+/* ============================================================
+   INTERACTIVE MODE
+   ============================================================ */
 
 typedef int (*simulation_should_stop_cb)(void *userdata);
 
 void sim_interactive(
-    const server_config *cfg,
+    const simulation_context *ctx,
     void (*writer)(const char *, void *),
     simulation_should_stop_cb should_stop,
     void *userdata
 );
-#endif
+
+#endif /* SIMULATION_H */

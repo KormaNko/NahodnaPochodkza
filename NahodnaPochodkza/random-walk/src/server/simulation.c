@@ -1,96 +1,120 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "simulation.h"
-#include <time.h>
 
-#include <stdlib.h> 
-#include <pthread.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
-#define MAX_POCET_KROKOV 100000 
 
+#define MAX_POCET_KROKOV 100000
 
+/* ============================================================
+   JEDEN KROK NÁHODNEJ POCHÔDZKY (s podporou prekážok)
+   ============================================================ */
+void sim_step(const simulation_context *ctx, int *x, int *y) {
+    const server_config *cfg = ctx->cfg;
 
-void sim_step(const server_config *cfg, int *x, int *y) {
+    int old_x = *x;
+    int old_y = *y;
+
     double r = rand() / (double)RAND_MAX;
 
-    if (r < cfg->pU) {
-        (*y) -= 1;
-    } else if (r < cfg->pU + cfg->pD) {
-        (*y) += 1;
-    } else if (r < cfg->pU + cfg->pD + cfg->pL) {
-        (*x) -= 1;
-    } else {
-        (*x) += 1;
-    }
+    if (r < cfg->pU) (*y)--;
+    else if (r < cfg->pU + cfg->pD) (*y)++;
+    else if (r < cfg->pU + cfg->pD + cfg->pL) (*x)--;
+    else (*x)++;
 
+    /* wrap-around svet */
     *x = (*x % cfg->sirka + cfg->sirka) % cfg->sirka;
     *y = (*y % cfg->vyska + cfg->vyska) % cfg->vyska;
+
+    /* prekážky */
+    if (cfg->prekazky && ctx->prekazky) {
+        int idx = (*y) * cfg->sirka + (*x);
+        if (ctx->prekazky[idx]) {
+            *x = old_x;
+            *y = old_y;
+        }
+    }
 }
 
-
-
-int sim_dojst_do_stredu_za_K(const server_config *cfg, int sx, int sy, int K) {
-   
+/* ============================================================
+   DOSIAHNUTIE STREDU DO K KROKOV
+   ============================================================ */
+int sim_dojst_do_stredu_za_K(
+    const simulation_context *ctx,
+    int sx, int sy, int K
+) {
     int x = sx, y = sy;
-    
-    if(x == 0 && y == 0) {
+
+    if (x == 0 && y == 0)
         return 1;
-    }
-    int i = 1;
-    while ( i <= K) {
-        sim_step(cfg,&x,&y);
-        if(x == 0 && y == 0) {
-        return 1;
-    }
-    i++;
+
+    for (int i = 0; i < K; ++i) {
+        sim_step(ctx, &x, &y);
+        if (x == 0 && y == 0)
+            return 1;
     }
     return 0;
 }
 
-unsigned long sim_kolko_krokov_kym_trafim(const server_config *cfg, int sx, int sy, unsigned long max_steps) {
-    
+/* ============================================================
+   POČET KROKOV K STREDU
+   ============================================================ */
+unsigned long sim_kolko_krokov_kym_trafim(
+    const simulation_context *ctx,
+    int sx, int sy,
+    unsigned long max_steps
+) {
     int x = sx, y = sy;
-    if(x == 0 && y == 0) {
-        return 0;
-    }
-    unsigned long i = 1;
-    while ( i < max_steps) {
 
-        sim_step(cfg,&x,&y);
-        if(x == 0 && 0 == y) {
-        return i;
-    }
-    i++;
+    if (x == 0 && y == 0)
+        return 0;
+
+    for (unsigned long i = 1; i < max_steps; ++i) {
+        sim_step(ctx, &x, &y);
+        if (x == 0 && y == 0)
+            return i;
     }
     return max_steps;
 }
 
-    sim_jedno_policko sim_simuluj_policko(const server_config *cfg, int sx, int sy, int K, unsigned long max_steps) {
-        sim_jedno_policko policko;
-    
-        int trafil = 0;
-        unsigned long long suma_krokov = 0;
+/* ============================================================
+   SIMULÁCIA JEDNÉHO POLÍČKA
+   ============================================================ */
+sim_jedno_policko sim_simuluj_policko(
+    const simulation_context *ctx,
+    int sx, int sy,
+    int K,
+    unsigned long max_steps
+) {
+    sim_jedno_policko res;
+    unsigned long long suma_krokov = 0;
+    int trafenych = 0;
 
-
-        for (int i = 0; i < cfg->R; i++)
-        {
-            
-            trafil += sim_dojst_do_stredu_za_K(cfg,sx,sy,K);
-            suma_krokov += sim_kolko_krokov_kym_trafim(cfg,sx,sy,max_steps);
-
-        } 
-        policko.avg_steps_to_hit = (double)suma_krokov /cfg->R;
-        policko.p_hit_within_K =    (double)trafil /cfg->R;
-       
-        return policko;
+    for (int r = 0; r < ctx->cfg->R; ++r) {
+        trafenych += sim_dojst_do_stredu_za_K(ctx, sx, sy, K);
+        suma_krokov += sim_kolko_krokov_kym_trafim(ctx, sx, sy, max_steps);
     }
 
-    void sim_vypocitaj_maticu(const server_config *cfg, policko_data *vystup_matica) {
-    unsigned long long pocetPolicok = cfg->vyska * cfg->sirka;
+    res.p_hit_within_K = (double)trafenych / ctx->cfg->R;
+    res.avg_steps_to_hit = (double)suma_krokov / ctx->cfg->R;
+    return res;
+}
 
-    for (unsigned long long i = 0; i < pocetPolicok; i++) {
+/* ============================================================
+   VÝPOČET CELEJ MATICE
+   ============================================================ */
+void sim_vypocitaj_maticu(
+    const simulation_context *ctx,
+    policko_data *vystup_matica
+) {
+    const server_config *cfg = ctx->cfg;
+    unsigned long long pocet = cfg->sirka * cfg->vyska;
+
+    for (unsigned long long i = 0; i < pocet; ++i) {
         int x = i % cfg->sirka;
         int y = i / cfg->sirka;
 
@@ -98,99 +122,93 @@ unsigned long sim_kolko_krokov_kym_trafim(const server_config *cfg, int sx, int 
         vystup_matica[i].y = y;
 
         vystup_matica[i].stats =
-            sim_simuluj_policko(cfg, x, y, cfg->K, MAX_POCET_KROKOV);
+            sim_simuluj_policko(ctx, x, y, cfg->K, MAX_POCET_KROKOV);
     }
 }
 
-void sim_vypis_maticu(const server_config *cfg, const policko_data *matica, int type) {
+/* ============================================================
+   MATICA → STRING (SUMMARY MODE)
+   ============================================================ */
+char *sim_matica_string(
+    const server_config *cfg,
+    const policko_data *matica,
+    int type
+) {
+    size_t odhad = (cfg->sirka * 8 + 2) * cfg->vyska + 1;
+    char *out = malloc(odhad);
+    if (!out) return NULL;
+
+    out[0] = '\0';
+
     for (int y = 0; y < cfg->vyska; ++y) {
         for (int x = 0; x < cfg->sirka; ++x) {
             int idx = y * cfg->sirka + x;
-            if (type == 0) {
-                printf("%5.3lf ", matica[idx].stats.p_hit_within_K);
-            } else {
-                printf("%5.2lf ", matica[idx].stats.avg_steps_to_hit);
-            }
-        }
-        printf("\n");
-    }
-}
-
-
-char *sim_matica_string(const server_config *cfg, const policko_data *matica, int type) {
-    
-    int sirka = cfg->sirka, vyska = cfg->vyska;
-    size_t estimate = (sirka * 8 + 3) * vyska + 1;
-    char *vystup = malloc(estimate);
-    if (!vystup) return NULL;
-
-    vystup[0] = '\0';
-    char riadok[256];
-    for (int y = 0; y < vyska; ++y) {
-        riadok[0] = '\0';
-        for (int x = 0; x < sirka; ++x) {
-            int idx = y * sirka + x;
             char tmp[32];
+
             if (type == 0)
-                snprintf(tmp, sizeof(tmp), "%5.3lf ", matica[idx].stats.p_hit_within_K);
+                snprintf(tmp, sizeof(tmp), "%5.3f ",
+                         matica[idx].stats.p_hit_within_K);
             else
-                snprintf(tmp, sizeof(tmp), "%5.2lf ", matica[idx].stats.avg_steps_to_hit);
-            strcat(riadok, tmp);
+                snprintf(tmp, sizeof(tmp), "%5.2f ",
+                         matica[idx].stats.avg_steps_to_hit);
+
+            strcat(out, tmp);
         }
-        strcat(riadok, "\n");
-        strcat(vystup, riadok);
+        strcat(out, "\n");
     }
-    return vystup;
+    return out;
 }
 
+/* ============================================================
+   INTERACTIVE MODE
+   ============================================================ */
 void sim_interactive(
-    const server_config *cfg,
+    const simulation_context *ctx,
     void (*writer)(const char *, void *),
     simulation_should_stop_cb should_stop,
     void *userdata
-)
-{
-    const unsigned long tick_ms = 200;
-    unsigned R = cfg->R;
-    unsigned K = cfg->K;
-    for (int start_y = 0; start_y < cfg->vyska; ++start_y) {
-        for (int start_x = 0; start_x < cfg->sirka; ++start_x) {
-            for (unsigned rep = 0; rep < R; ++rep) {
+) {
+    const server_config *cfg = ctx->cfg;
+    const unsigned tick_ms = 200;
+
+    for (int sy = 0; sy < cfg->vyska; ++sy) {
+        for (int sx = 0; sx < cfg->sirka; ++sx) {
+            for (int r = 0; r < cfg->R; ++r) {
+
                 if (should_stop && should_stop(userdata))
-        return;
-                int x = start_x, y = start_y;
-                unsigned kroky = 0;
+                    return;
+
+                int x = sx, y = sy;
                 char info[128];
-                snprintf(info, sizeof(info), "REPLIKACIA %u/%u Z POLICKA [%d,%d]\n",
-                         rep+1, R, start_x, start_y);
+                snprintf(info, sizeof(info),
+                         "REPLIKACIA %d/%d Z POLICKA [%d,%d]\n",
+                         r + 1, cfg->R, sx, sy);
                 writer(info, userdata);
 
-                for (unsigned k = 0; k < K; ++k) {
+                for (int k = 0; k < cfg->K; ++k) {
                     if (should_stop && should_stop(userdata))
-        return;
-                    kroky++;
-                    sim_step(cfg, &x, &y);
-                    char buf[128];
-                    snprintf(buf, sizeof(buf), "UPDATE start_x=%d start_y=%d rep=%u krok=%u x=%d y=%d\n",
-                             start_x, start_y, rep+1, kroky, x, y);
-                    writer(buf, userdata);
+                        return;
+
+                    sim_step(ctx, &x, &y);
+
+                    char upd[128];
+                    snprintf(upd, sizeof(upd),
+                             "UPDATE start_x=%d start_y=%d rep=%d krok=%d x=%d y=%d\n",
+                             sx, sy, r + 1, k + 1, x, y);
+                    writer(upd, userdata);
 
                     if (x == 0 && y == 0) {
                         writer("DOSIAHNUTY STRED\n", userdata);
                         break;
                     }
-                   struct timespec ts;
-ts.tv_sec = tick_ms / 1000;
-ts.tv_nsec = (tick_ms % 1000) * 1000 * 1000;
-nanosleep(&ts, NULL);
 
+                    struct timespec ts;
+                    ts.tv_sec = tick_ms / 1000;
+                    ts.tv_nsec = (tick_ms % 1000) * 1000000;
+                    nanosleep(&ts, NULL);
                 }
             }
         }
     }
-    writer("INTERACTIVE MOD KONCI (vsetky replikacie hotove)\n", userdata);
+    writer("INTERACTIVE MOD KONCI\n", userdata);
 }
-
-
-
-
